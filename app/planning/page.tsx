@@ -6,14 +6,11 @@ export const metadata = {
 
 export default function PlanningPage() {
   return (
-    <main className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-zinc-900">Planning de l&apos;équipe</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Visualisez les shifts de toute l&apos;équipe par semaine.
-        </p>
+    <main className="flex-1 flex flex-col py-6 px-4 max-w-7xl mx-auto w-full gap-4">
+      <h1 className="text-xl font-bold text-zinc-900 px-2">Planning de l&apos;équipe</h1>
+      <div className="rounded-xl overflow-hidden border border-zinc-200 shadow-sm bg-white">
+        <WeeklyPlanningGrid />
       </div>
-      <WeeklyPlanningGrid />
     </main>
   );
 }

@@ -1,19 +1,23 @@
 export type TeamMember = {
   id: string;
-  name: string;
+  full_name: string;
   role: string;
   avatar_url: string | null;
   color: string;
+  contract_hours: number;
+  active: boolean;
   created_at: string;
 };
 
 export type Shift = {
   id: string;
-  team_member_id: string;
-  date: string; // ISO date string YYYY-MM-DD
-  start_time: string; // HH:MM
-  end_time: string; // HH:MM
+  employee_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
   label: string | null;
+  break_minutes: number;
+  color: string;
   created_at: string;
 };
 

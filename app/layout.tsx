@@ -27,17 +27,18 @@ export default function RootLayout({
       lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-50">
-        <header className="bg-white border-b border-zinc-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-3">
-            <span className="text-lg font-bold text-zinc-900 tracking-tight">
+      <body className="min-h-full flex flex-col" style={{ backgroundColor: "#f4f5f7" }}>
+        <header style={{ backgroundColor: "#1a1a2e" }}>
+          <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
+            <span className="text-white font-bold text-lg tracking-tight">
               Suzette
             </span>
-            <span className="text-zinc-300">|</span>
-            <nav className="flex items-center gap-4 text-sm">
+            <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
+            <nav className="flex items-center gap-5">
               <a
                 href="/planning"
-                className="text-zinc-600 hover:text-zinc-900 font-medium transition-colors"
+                className="text-sm font-medium transition-colors"
+                style={{ color: "rgba(255,255,255,0.7)" }}
               >
                 Planning
               </a>
