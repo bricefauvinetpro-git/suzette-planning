@@ -2,6 +2,7 @@ import type { ShiftWithMember } from "@/types/index";
 
 type Props = {
   shift: ShiftWithMember;
+  onClick?: (e: React.MouseEvent) => void;
 };
 
 const SPECIAL_LABELS: Record<string, { bg: string; text: string }> = {
@@ -16,17 +17,20 @@ function detectSpecial(label: string | null) {
   return null;
 }
 
-export default function ShiftCard({ shift }: Props) {
+export default function ShiftCard({ shift, onClick }: Props) {
   const { start_time, end_time, label, color } = shift;
   const special = detectSpecial(label);
 
   const bg = special?.bg ?? color;
   const textColor = special?.text ?? "#ffffff";
-  const isLight = special != null;
+  const subColor = special
+    ? `${special.text}b3`
+    : "rgba(255,255,255,0.8)";
 
   return (
     <div
-      className="rounded-md px-2 py-1.5 shadow-sm"
+      onClick={onClick}
+      className="rounded-md px-2 py-1.5 shadow-sm cursor-pointer hover:brightness-95 active:brightness-90 transition-all select-none"
       style={{ backgroundColor: bg }}
     >
       <p
@@ -35,16 +39,9 @@ export default function ShiftCard({ shift }: Props) {
       >
         {label ?? "Shift"}
       </p>
-      {!isLight && (
-        <p className="text-[11px] leading-tight mt-0.5" style={{ color: "rgba(255,255,255,0.8)" }}>
-          {start_time}–{end_time}
-        </p>
-      )}
-      {isLight && (
-        <p className="text-[11px] leading-tight mt-0.5" style={{ color: textColor, opacity: 0.7 }}>
-          {start_time}–{end_time}
-        </p>
-      )}
+      <p className="text-[11px] leading-tight mt-0.5" style={{ color: subColor }}>
+        {start_time}–{end_time}
+      </p>
     </div>
   );
 }

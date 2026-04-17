@@ -19,6 +19,7 @@ export type Shift = {
   label: string | null;
   break_minutes: number;
   color: string;
+  notes: string | null;
   created_at: string;
 };
 

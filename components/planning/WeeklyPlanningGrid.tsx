@@ -14,27 +14,34 @@ import {
 import type { TeamMember, ShiftWithMember } from "@/types/index";
 import ShiftCard from "./ShiftCard";
 import EmployeeAvatar from "./EmployeeAvatar";
+import ShiftModal, { type ShiftFormState, SHIFT_LABELS } from "./ShiftModal";
+
+type ModalState = {
+  mode: "create" | "edit";
+  member: TeamMember;
+  date: Date;
+  shift?: ShiftWithMember;
+} | null;
 
 export default function WeeklyPlanningGrid() {
   const [referenceDate, setReferenceDate] = useState(new Date());
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [shifts, setShifts] = useState<ShiftWithMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<ModalState>(null);
+  const [modalSaving, setModalSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const weekDates = getWeekDates(referenceDate);
   const startDate = formatDate(weekDates[0]);
   const endDate = formatDate(weekDates[6]);
 
   useEffect(() => {
-    async function load() {
+    async function loadAll() {
       setLoading(true);
       const sb = getSupabase();
       const [{ data: membersData }, { data: shiftsData }] = await Promise.all([
-        sb
-          .from("team_members")
-          .select("*")
-          .eq("active", true)
-          .order("full_name"),
+        sb.from("team_members").select("*").eq("active", true).order("full_name"),
         sb
           .from("shifts")
           .select("*, team_member:team_members(*)")
@@ -46,8 +53,19 @@ export default function WeeklyPlanningGrid() {
       setShifts((shiftsData as ShiftWithMember[]) ?? []);
       setLoading(false);
     }
-    load();
+    loadAll();
   }, [startDate, endDate]);
+
+  async function refreshShifts() {
+    const { data, error } = await getSupabase()
+      .from("shifts")
+      .select("*, team_member:team_members(*)")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("start_time");
+    if (error) console.error("Erreur refresh shifts:", error);
+    setShifts((data as ShiftWithMember[]) ?? []);
+  }
 
   function navigate(weeks: number) {
     setReferenceDate((d) => addWeeks(d, weeks));
@@ -63,16 +81,97 @@ export default function WeeklyPlanningGrid() {
       .filter((s) => s.employee_id === memberId)
       .reduce(
         (acc, s) =>
-          acc +
-          shiftDurationMinutes(s.start_time, s.end_time, s.break_minutes || 0),
+          acc + shiftDurationMinutes(s.start_time, s.end_time, s.break_minutes || 0),
         0
       );
     return Math.round((minutes / 60) * 10) / 10;
   }
 
+  function openCreate(member: TeamMember, date: Date) {
+    setModalError(null);
+    setModal({ mode: "create", member, date });
+  }
+
+  function openEdit(shift: ShiftWithMember, e: React.MouseEvent) {
+    e.stopPropagation();
+    setModalError(null);
+    setModal({
+      mode: "edit",
+      member: shift.team_member,
+      date: new Date(shift.date + "T00:00:00"),
+      shift,
+    });
+  }
+
+  async function handleSave(form: ShiftFormState) {
+    if (!modal) return;
+    setModalError(null);
+    setModalSaving(true);
+
+    let error: { message: string } | null = null;
+
+    if (modal.mode === "create") {
+      const payload = {
+        employee_id: modal.member.id,
+        date: formatDate(modal.date),
+        start_time: form.start_time,
+        end_time: form.end_time,
+        label: form.label,
+        break_minutes: form.break_minutes,
+        notes: form.notes.trim() || null,
+        color: modal.member.color,
+      };
+      console.log("INSERT shift:", payload);
+      ({ error } = await getSupabase().from("shifts").insert(payload));
+    } else if (modal.shift) {
+      const patch = {
+        start_time: form.start_time,
+        end_time: form.end_time,
+        label: form.label,
+        break_minutes: form.break_minutes,
+        notes: form.notes.trim() || null,
+      };
+      console.log("UPDATE shift:", modal.shift.id, patch);
+      ({ error } = await getSupabase()
+        .from("shifts")
+        .update(patch)
+        .eq("id", modal.shift.id));
+    }
+
+    setModalSaving(false);
+
+    if (error) {
+      console.error("Erreur shift:", error);
+      setModalError(`Erreur : ${error.message}`);
+      return;
+    }
+
+    setModal(null);
+    await refreshShifts();
+  }
+
+  async function handleDelete() {
+    if (!modal?.shift) return;
+    setModalSaving(true);
+    const { error } = await getSupabase()
+      .from("shifts")
+      .delete()
+      .eq("id", modal.shift.id);
+    setModalSaving(false);
+
+    if (error) {
+      console.error("Erreur suppression shift:", error);
+      setModalError(`Erreur : ${error.message}`);
+      return;
+    }
+
+    setModal(null);
+    await refreshShifts();
+  }
+
   return (
     <div className="flex flex-col min-h-0">
-      {/* Week navigation bar */}
+      {/* Week navigation */}
       <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-zinc-200">
         <button
           onClick={() => navigate(-1)}
@@ -103,7 +202,6 @@ export default function WeeklyPlanningGrid() {
             ))}
           </colgroup>
 
-          {/* Day headers */}
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50">
               <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
@@ -123,9 +221,7 @@ export default function WeeklyPlanningGrid() {
                       </span>
                       <span
                         className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-semibold ${
-                          today
-                            ? "bg-indigo-600 text-white"
-                            : "text-zinc-700"
+                          today ? "bg-indigo-600 text-white" : "text-zinc-700"
                         }`}
                       >
                         {day}
@@ -160,7 +256,7 @@ export default function WeeklyPlanningGrid() {
                       i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"
                     }`}
                   >
-                    {/* Employee cell */}
+                    {/* Employee column */}
                     <td className="px-4 py-3 border-r border-zinc-100">
                       <div className="flex items-center gap-2.5">
                         <EmployeeAvatar member={member} />
@@ -171,7 +267,7 @@ export default function WeeklyPlanningGrid() {
                           <p className="text-xs text-zinc-400 leading-tight mt-0.5">
                             {member.role}
                           </p>
-                          <p className="text-[11px] text-zinc-400 leading-tight mt-0.5">
+                          <p className="text-[11px] leading-tight mt-0.5">
                             <span
                               className={
                                 planned > member.contract_hours
@@ -181,7 +277,9 @@ export default function WeeklyPlanningGrid() {
                             >
                               {planned}h
                             </span>
-                            <span className="text-zinc-300"> / {member.contract_hours}h</span>
+                            <span className="text-zinc-300">
+                              {" "}/ {member.contract_hours}h
+                            </span>
                           </p>
                         </div>
                       </div>
@@ -194,15 +292,25 @@ export default function WeeklyPlanningGrid() {
                       return (
                         <td
                           key={d.toISOString()}
-                          className={`px-2 py-2 border-r border-zinc-100 align-top ${
-                            today ? "bg-indigo-50/30" : ""
+                          onClick={() => openCreate(member, d)}
+                          className={`px-2 py-2 border-r border-zinc-100 align-top cursor-pointer transition-colors group ${
+                            today ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-zinc-50"
                           }`}
-                          style={{ minHeight: 64 }}
+                          style={{ minHeight: 72 }}
                         >
                           <div className="flex flex-col gap-1">
                             {dayShifts.map((s) => (
-                              <ShiftCard key={s.id} shift={s} />
+                              <ShiftCard
+                                key={s.id}
+                                shift={s}
+                                onClick={(e) => openEdit(s, e)}
+                              />
                             ))}
+                            {dayShifts.length === 0 && (
+                              <span className="text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                                + Ajouter
+                              </span>
+                            )}
                           </div>
                         </td>
                       );
@@ -214,6 +322,31 @@ export default function WeeklyPlanningGrid() {
           </tbody>
         </table>
       </div>
+
+      {/* Shift modal */}
+      {modal && (
+        <ShiftModal
+          mode={modal.mode}
+          member={modal.member}
+          date={modal.date}
+          initialForm={
+            modal.shift
+              ? {
+                  label: modal.shift.label ?? SHIFT_LABELS[0],
+                  start_time: modal.shift.start_time,
+                  end_time: modal.shift.end_time,
+                  break_minutes: modal.shift.break_minutes || 30,
+                  notes: modal.shift.notes ?? "",
+                }
+              : undefined
+          }
+          saving={modalSaving}
+          error={modalError}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+          onDelete={modal.mode === "edit" ? handleDelete : undefined}
+        />
+      )}
     </div>
   );
 }
