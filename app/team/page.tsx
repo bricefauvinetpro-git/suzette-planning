@@ -5,9 +5,12 @@ import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import type { TeamMember } from "@/types/index";
 
+const CONTRACT_TYPES = ["CDI", "CDD", "Extra", "Apprentissage", "Stage"] as const;
+
 type FormState = {
   full_name: string;
   role: string;
+  contract_type: string;
   contract_hours: number;
   color: string;
 };
@@ -15,24 +18,30 @@ type FormState = {
 const DEFAULT_FORM: FormState = {
   full_name: "",
   role: "",
+  contract_type: "CDI",
   contract_hours: 35,
   color: "#6366f1",
 };
+
+const INPUT_CLS =
+  "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
 
   async function loadMembers() {
     setLoading(true);
-    const { data } = await getSupabase()
+    const { data, error } = await getSupabase()
       .from("team_members")
       .select("*")
       .eq("active", true)
       .order("full_name");
+    if (error) console.error("Erreur chargement équipe:", error);
     setMembers(data ?? []);
     setLoading(false);
   }
@@ -43,11 +52,39 @@ export default function TeamPage() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    setSaveError(null);
+
+    const trimmedName = form.full_name.trim();
+    if (!trimmedName) {
+      setSaveError("Le nom complet est requis.");
+      return;
+    }
+
+    const payload = {
+      full_name: trimmedName,
+      role: form.role.trim(),
+      contract_type: form.contract_type,
+      contract_hours: form.contract_hours,
+      color: form.color,
+      avatar_url: null,
+      active: true,
+    };
+
+    console.log("INSERT team_members payload:", payload);
     setSaving(true);
-    await getSupabase()
+
+    const { error } = await getSupabase()
       .from("team_members")
-      .insert({ ...form, avatar_url: null, active: true });
+      .insert(payload);
+
     setSaving(false);
+
+    if (error) {
+      console.error("Erreur INSERT team_members:", error);
+      setSaveError(`Erreur : ${error.message}`);
+      return;
+    }
+
     setShowModal(false);
     setForm(DEFAULT_FORM);
     loadMembers();
@@ -55,10 +92,11 @@ export default function TeamPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Supprimer cet employé du planning ?")) return;
-    await getSupabase()
+    const { error } = await getSupabase()
       .from("team_members")
       .update({ active: false })
       .eq("id", id);
+    if (error) console.error("Erreur suppression:", error);
     loadMembers();
   }
 
@@ -70,6 +108,8 @@ export default function TeamPage() {
       .join("")
       .toUpperCase();
   }
+
+  const COLS = ["Nom", "Rôle", "Contrat", "Heures / sem.", "Couleur", "Actions"];
 
   return (
     <main className="flex-1 px-4 py-6 max-w-5xl mx-auto w-full">
@@ -85,7 +125,7 @@ export default function TeamPage() {
           <h1 className="text-xl font-bold text-zinc-900">Équipe</h1>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => { setSaveError(null); setShowModal(true); }}
           className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
         >
           + Ajouter un collaborateur
@@ -97,34 +137,26 @@ export default function TeamPage() {
         <table className="w-full text-sm">
           <thead className="bg-zinc-50 border-b border-zinc-200">
             <tr>
-              {["Nom", "Rôle", "Heures contrat", "Couleur", "Actions"].map(
-                (col) => (
-                  <th
-                    key={col}
-                    className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
-                  >
-                    {col}
-                  </th>
-                )
-              )}
+              {COLS.map((col) => (
+                <th
+                  key={col}
+                  className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
+                  {col}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td
-                  colSpan={5}
-                  className="py-14 text-center text-zinc-400 text-sm"
-                >
+                <td colSpan={COLS.length} className="py-14 text-center text-zinc-400 text-sm">
                   Chargement…
                 </td>
               </tr>
             ) : members.length === 0 ? (
               <tr>
-                <td
-                  colSpan={5}
-                  className="py-14 text-center text-zinc-400 text-sm"
-                >
+                <td colSpan={COLS.length} className="py-14 text-center text-zinc-400 text-sm">
                   Aucun employé actif. Ajoutez votre premier collaborateur.
                 </td>
               </tr>
@@ -132,9 +164,7 @@ export default function TeamPage() {
               members.map((m, i) => (
                 <tr
                   key={m.id}
-                  className={`border-b border-zinc-100 ${
-                    i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"
-                  }`}
+                  className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
@@ -144,24 +174,27 @@ export default function TeamPage() {
                       >
                         {initials(m.full_name)}
                       </span>
-                      <span className="font-medium text-zinc-900">
-                        {m.full_name}
-                      </span>
+                      <span className="font-medium text-zinc-900">{m.full_name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-zinc-600">{m.role}</td>
-                  <td className="px-4 py-3 text-zinc-600">
-                    {m.contract_hours}h / sem.
+                  <td className="px-4 py-3 text-zinc-600">{m.role || "—"}</td>
+                  <td className="px-4 py-3">
+                    {m.contract_type ? (
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                        {m.contract_type}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-300">—</span>
+                    )}
                   </td>
+                  <td className="px-4 py-3 text-zinc-600">{m.contract_hours}h</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span
                         className="w-5 h-5 rounded-full border border-zinc-200 shrink-0"
                         style={{ backgroundColor: m.color }}
                       />
-                      <span className="text-xs text-zinc-400 font-mono">
-                        {m.color}
-                      </span>
+                      <span className="text-xs text-zinc-400 font-mono">{m.color}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -184,39 +217,47 @@ export default function TeamPage() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false);
-          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <h2 className="text-lg font-semibold text-zinc-900 mb-5">
               Ajouter un collaborateur
             </h2>
+
             <form onSubmit={handleAdd} className="flex flex-col gap-4">
               <Field label="Prénom & Nom">
                 <input
                   type="text"
                   required
                   value={form.full_name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, full_name: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
                   placeholder="Marie Dupont"
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className={INPUT_CLS}
                 />
               </Field>
-              <Field label="Rôle">
+
+              <Field label="Poste / Métier">
                 <input
                   type="text"
-                  required
                   value={form.role}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, role: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
                   placeholder="Serveuse, Cuisinier…"
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className={INPUT_CLS}
                 />
               </Field>
+
+              <Field label="Type de contrat">
+                <select
+                  value={form.contract_type}
+                  onChange={(e) => setForm((f) => ({ ...f, contract_type: e.target.value }))}
+                  className={INPUT_CLS}
+                >
+                  {CONTRACT_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </Field>
+
               <Field label="Heures contractuelles / semaine">
                 <input
                   type="number"
@@ -225,35 +266,35 @@ export default function TeamPage() {
                   max={60}
                   value={form.contract_hours}
                   onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      contract_hours: Number(e.target.value),
-                    }))
+                    setForm((f) => ({ ...f, contract_hours: Number(e.target.value) }))
                   }
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className={INPUT_CLS}
                 />
               </Field>
+
               <Field label="Couleur d'identification">
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
                     value={form.color}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, color: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
                     className="w-10 h-10 rounded-lg border border-zinc-200 cursor-pointer p-0.5"
                   />
-                  <span className="text-sm text-zinc-500 font-mono">
-                    {form.color}
-                  </span>
+                  <span className="text-sm text-zinc-500 font-mono">{form.color}</span>
                   <span
-                    className="w-8 h-8 rounded-full border border-zinc-200"
+                    className="w-8 h-8 rounded-full border border-zinc-200 shrink-0"
                     style={{ backgroundColor: form.color }}
                   />
                 </div>
               </Field>
 
-              <div className="flex gap-3 mt-2">
+              {saveError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                  {saveError}
+                </p>
+              )}
+
+              <div className="flex gap-3 mt-1">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
@@ -277,18 +318,10 @@ export default function TeamPage() {
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-zinc-700 mb-1">
-        {label}
-      </label>
+      <label className="block text-sm font-medium text-zinc-700 mb-1">{label}</label>
       {children}
     </div>
   );

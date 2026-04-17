@@ -2,6 +2,7 @@ export type TeamMember = {
   id: string;
   full_name: string;
   role: string;
+  contract_type: string | null;
   avatar_url: string | null;
   color: string;
   contract_hours: number;
