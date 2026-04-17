@@ -42,6 +42,13 @@ export default function RootLayout({
               >
                 Planning
               </a>
+              <a
+                href="/team"
+                className="text-sm font-medium transition-colors"
+                style={{ color: "rgba(255,255,255,0.7)" }}
+              >
+                Équipe
+              </a>
             </nav>
           </div>
         </header>
