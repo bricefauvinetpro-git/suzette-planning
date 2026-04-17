@@ -167,15 +167,17 @@ export default function TeamPage() {
                   className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
                 >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
+                    <Link href={`/team/${m.id}`} className="flex items-center gap-2.5 group">
                       <span
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
                         style={{ backgroundColor: m.color }}
                       >
                         {initials(m.full_name)}
                       </span>
-                      <span className="font-medium text-zinc-900">{m.full_name}</span>
-                    </div>
+                      <span className="font-medium text-zinc-900 group-hover:text-indigo-600 transition-colors">
+                        {m.full_name}
+                      </span>
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{m.role || "—"}</td>
                   <td className="px-4 py-3">

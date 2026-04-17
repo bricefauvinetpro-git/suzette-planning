@@ -7,6 +7,12 @@ export type TeamMember = {
   color: string;
   contract_hours: number;
   active: boolean;
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  start_date: string | null;
+  hourly_rate: number | null;
+  availability: Record<string, boolean> | null;
   created_at: string;
 };
 
