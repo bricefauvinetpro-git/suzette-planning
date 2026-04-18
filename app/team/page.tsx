@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import type { TeamMember } from "@/types/index";
+import { useEstablishment } from "@/lib/establishment-context";
 
 const CONTRACT_TYPES = ["CDI", "CDD", "Extra", "Apprentissage", "Stage"] as const;
 
@@ -27,6 +28,7 @@ const INPUT_CLS =
   "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
 
 export default function TeamPage() {
+  const { selectedId, loading: estLoading } = useEstablishment();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -34,12 +36,13 @@ export default function TeamPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
 
-  async function loadMembers() {
+  async function loadMembers(estId: string) {
     setLoading(true);
     const { data, error } = await getSupabase()
       .from("team_members")
       .select("*")
       .eq("active", true)
+      .eq("establishment_id", estId)
       .order("full_name");
     if (error) console.error("Erreur chargement équipe:", error);
     setMembers(data ?? []);
@@ -47,8 +50,9 @@ export default function TeamPage() {
   }
 
   useEffect(() => {
-    loadMembers();
-  }, []);
+    if (estLoading || !selectedId) return;
+    loadMembers(selectedId);
+  }, [selectedId, estLoading]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -68,6 +72,7 @@ export default function TeamPage() {
       color: form.color,
       avatar_url: null,
       active: true,
+      establishment_id: selectedId,
     };
 
     console.log("INSERT team_members payload:", payload);
@@ -87,7 +92,7 @@ export default function TeamPage() {
 
     setShowModal(false);
     setForm(DEFAULT_FORM);
-    loadMembers();
+    if (selectedId) loadMembers(selectedId);
   }
 
   async function handleDelete(id: string) {
@@ -97,7 +102,7 @@ export default function TeamPage() {
       .update({ active: false })
       .eq("id", id);
     if (error) console.error("Erreur suppression:", error);
-    loadMembers();
+    if (selectedId) loadMembers(selectedId);
   }
 
   function initials(name: string) {

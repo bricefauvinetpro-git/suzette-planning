@@ -13,6 +13,7 @@ export type TeamMember = {
   start_date: string | null;
   hourly_rate: number | null;
   availability: Record<string, boolean> | null;
+  establishment_id: string | null;
   created_at: string;
 };
 

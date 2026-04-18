@@ -15,6 +15,7 @@ import type { TeamMember, ShiftWithMember } from "@/types/index";
 import ShiftCard from "./ShiftCard";
 import EmployeeAvatar from "./EmployeeAvatar";
 import ShiftModal, { type ShiftFormState, SHIFT_LABELS } from "./ShiftModal";
+import { useEstablishment } from "@/lib/establishment-context";
 
 type ModalState = {
   mode: "create" | "edit";
@@ -24,6 +25,7 @@ type ModalState = {
 } | null;
 
 export default function WeeklyPlanningGrid() {
+  const { selectedId, loading: estLoading } = useEstablishment();
   const [referenceDate, setReferenceDate] = useState(new Date());
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [shifts, setShifts] = useState<ShiftWithMember[]>([]);
@@ -37,11 +39,17 @@ export default function WeeklyPlanningGrid() {
   const endDate = formatDate(weekDates[6]);
 
   useEffect(() => {
+    if (estLoading || !selectedId) return;
     async function loadAll() {
       setLoading(true);
       const sb = getSupabase();
       const [{ data: membersData }, { data: shiftsData }] = await Promise.all([
-        sb.from("team_members").select("*").eq("active", true).order("full_name"),
+        sb
+          .from("team_members")
+          .select("*")
+          .eq("active", true)
+          .eq("establishment_id", selectedId)
+          .order("full_name"),
         sb
           .from("shifts")
           .select("*, team_member:team_members(*)")
@@ -54,9 +62,10 @@ export default function WeeklyPlanningGrid() {
       setLoading(false);
     }
     loadAll();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, selectedId, estLoading]);
 
   async function refreshShifts() {
+    if (!selectedId) return;
     const { data, error } = await getSupabase()
       .from("shifts")
       .select("*, team_member:team_members(*)")

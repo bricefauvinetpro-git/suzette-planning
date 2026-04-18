@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { EstablishmentProvider } from "@/lib/establishment-context";
+import AppHeader from "@/components/AppHeader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,38 +30,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col" style={{ backgroundColor: "#f4f5f7" }}>
-        <header style={{ backgroundColor: "#1a1a2e" }}>
-          <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
-            <span className="text-white font-bold text-lg tracking-tight">
-              Suzette
-            </span>
-            <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
-            <nav className="flex items-center gap-5">
-              <a
-                href="/planning"
-                className="text-sm font-medium transition-colors"
-                style={{ color: "rgba(255,255,255,0.7)" }}
-              >
-                Planning
-              </a>
-              <a
-                href="/team"
-                className="text-sm font-medium transition-colors"
-                style={{ color: "rgba(255,255,255,0.7)" }}
-              >
-                Équipe
-              </a>
-              <a
-                href="/configuration"
-                className="text-sm font-medium transition-colors"
-                style={{ color: "rgba(255,255,255,0.7)" }}
-              >
-                Configuration
-              </a>
-            </nav>
-          </div>
-        </header>
-        {children}
+        <EstablishmentProvider>
+          <AppHeader />
+          {children}
+        </EstablishmentProvider>
       </body>
     </html>
   );
