@@ -60,7 +60,7 @@ export default function AppHeader() {
   };
 
   return (
-    <header style={{ backgroundColor: "#1a1a2e" }} className="relative z-20">
+    <header style={{ backgroundColor: "#1a1a2e", position: "relative", zIndex: 9999 }}>
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <span className="text-white font-bold text-lg tracking-tight shrink-0">
           Suzette
