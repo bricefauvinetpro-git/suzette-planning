@@ -12,13 +12,11 @@ type ModalState = {
 } | null;
 
 type EstForm = {
-  name: string;
-  address: string;
-  postal_code: string;
-  city: string;
+  nom: string;
+  adresse: string;
 };
 
-const EMPTY_FORM: EstForm = { name: "", address: "", postal_code: "", city: "" };
+const EMPTY_FORM: EstForm = { nom: "", adresse: "" };
 
 const INPUT_CLS =
   "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
@@ -26,11 +24,11 @@ const INPUT_CLS =
 export default function EtablissementsPage() {
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [form, setForm] = useState<EstForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -39,8 +37,8 @@ export default function EtablissementsPage() {
     setLoadError(null);
     const { data, error } = await getSupabase()
       .from("establishments")
-      .select("id, name, address, postal_code, city, created_at")
-      .order("name");
+      .select("identifiant, nom, adresse")
+      .order("nom");
     if (error) {
       console.error("Erreur chargement établissements:", error);
       setLoadError(error.message);
@@ -58,25 +56,21 @@ export default function EtablissementsPage() {
   function openEdit(est: Establishment) {
     setSaveError(null);
     setForm({
-      name: est.name,
-      address: est.address ?? "",
-      postal_code: est.postal_code ?? "",
-      city: est.city ?? "",
+      nom: est.nom,
+      adresse: est.adresse ?? "",
     });
     setModal({ mode: "edit", data: est });
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setSaveError("Le nom est obligatoire."); return; }
+    if (!form.nom.trim()) { setSaveError("Le nom est obligatoire."); return; }
     setSaveError(null);
     setSaving(true);
 
     const payload = {
-      name: form.name.trim(),
-      address: form.address.trim() || null,
-      postal_code: form.postal_code.trim() || null,
-      city: form.city.trim() || null,
+      nom: form.nom.trim(),
+      adresse: form.adresse.trim() || null,
     };
 
     let error;
@@ -86,7 +80,7 @@ export default function EtablissementsPage() {
       ({ error } = await getSupabase()
         .from("establishments")
         .update(payload)
-        .eq("id", modal!.data!.id));
+        .eq("identifiant", modal!.data!.identifiant));
     }
 
     setSaving(false);
@@ -96,11 +90,11 @@ export default function EtablissementsPage() {
   }
 
   async function handleDelete(est: Establishment) {
-    if (!confirm(`Supprimer "${est.name}" ?`)) return;
+    if (!confirm(`Supprimer "${est.nom}" ?`)) return;
     const { error } = await getSupabase()
       .from("establishments")
       .delete()
-      .eq("id", est.id);
+      .eq("identifiant", est.identifiant);
     if (error) console.error("Erreur suppression:", error);
     load();
   }
@@ -130,7 +124,7 @@ export default function EtablissementsPage() {
         <table className="w-full text-sm">
           <thead className="bg-zinc-50 border-b border-zinc-200">
             <tr>
-              {["Nom", "Adresse", "Ville", "Actions"].map((h) => (
+              {["Nom", "Adresse", "Actions"].map((h) => (
                 <th
                   key={h}
                   className={`px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider ${
@@ -145,27 +139,24 @@ export default function EtablissementsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="py-14 text-center text-zinc-400 text-sm">
+                <td colSpan={3} className="py-14 text-center text-zinc-400 text-sm">
                   Chargement…
                 </td>
               </tr>
             ) : establishments.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-14 text-center text-zinc-400 text-sm">
+                <td colSpan={3} className="py-14 text-center text-zinc-400 text-sm">
                   Aucun établissement. Ajoutez-en un pour commencer.
                 </td>
               </tr>
             ) : (
               establishments.map((est, i) => (
                 <tr
-                  key={est.id}
+                  key={est.identifiant}
                   className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
                 >
-                  <td className="px-4 py-3 font-medium text-zinc-900">{est.name}</td>
-                  <td className="px-4 py-3 text-zinc-500 text-sm">
-                    {[est.address, est.postal_code].filter(Boolean).join(", ") || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600">{est.city || "—"}</td>
+                  <td className="px-4 py-3 font-medium text-zinc-900">{est.nom}</td>
+                  <td className="px-4 py-3 text-zinc-500 text-sm">{est.adresse || "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-4">
                       <button
@@ -215,8 +206,8 @@ export default function EtablissementsPage() {
                 <input
                   type="text"
                   required
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  value={form.nom}
+                  onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))}
                   placeholder="Suzette Crêperie Urbaine"
                   className={INPUT_CLS}
                 />
@@ -225,33 +216,12 @@ export default function EtablissementsPage() {
               <Field label="Adresse">
                 <input
                   type="text"
-                  value={form.address}
-                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  placeholder="12 rue de la Paix"
+                  value={form.adresse}
+                  onChange={(e) => setForm((f) => ({ ...f, adresse: e.target.value }))}
+                  placeholder="12 rue de la Paix, 75001 Paris"
                   className={INPUT_CLS}
                 />
               </Field>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Code postal">
-                  <input
-                    type="text"
-                    value={form.postal_code}
-                    onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))}
-                    placeholder="75001"
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="Ville">
-                  <input
-                    type="text"
-                    value={form.city}
-                    onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                    placeholder="Paris"
-                    className={INPUT_CLS}
-                  />
-                </Field>
-              </div>
 
               {saveError && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{saveError}</p>

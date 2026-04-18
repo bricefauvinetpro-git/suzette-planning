@@ -34,12 +34,9 @@ export type ShiftWithMember = Shift & {
 };
 
 export type Establishment = {
-  id: string;
-  name: string;
-  address: string | null;
-  postal_code: string | null;
-  city: string | null;
-  created_at: string;
+  identifiant: string;
+  nom: string;
+  adresse: string | null;
 };
 
 export type EmployeeDocument = {
