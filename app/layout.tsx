@@ -49,6 +49,13 @@ export default function RootLayout({
               >
                 Équipe
               </a>
+              <a
+                href="/configuration"
+                className="text-sm font-medium transition-colors"
+                style={{ color: "rgba(255,255,255,0.7)" }}
+              >
+                Configuration
+              </a>
             </nav>
           </div>
         </header>

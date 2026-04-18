@@ -33,6 +33,15 @@ export type ShiftWithMember = Shift & {
   team_member: TeamMember;
 };
 
+export type Establishment = {
+  id: string;
+  name: string;
+  address: string | null;
+  postal_code: string | null;
+  city: string | null;
+  created_at: string;
+};
+
 export type EmployeeDocument = {
   id: string;
   employee_id: string;

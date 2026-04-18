@@ -1,0 +1,279 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { getSupabase } from "@/lib/supabase";
+import type { Establishment } from "@/types/index";
+
+type Mode = "add" | "edit";
+
+type ModalState = {
+  mode: Mode;
+  data?: Establishment;
+} | null;
+
+type EstForm = {
+  name: string;
+  address: string;
+  postal_code: string;
+  city: string;
+};
+
+const EMPTY_FORM: EstForm = { name: "", address: "", postal_code: "", city: "" };
+
+const INPUT_CLS =
+  "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
+
+export default function EtablissementsPage() {
+  const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<ModalState>(null);
+  const [form, setForm] = useState<EstForm>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data, error } = await getSupabase()
+      .from("establishments")
+      .select("*")
+      .order("name");
+    if (error) console.error("Erreur chargement établissements:", error);
+    setEstablishments(data ?? []);
+    setLoading(false);
+  }
+
+  function openAdd() {
+    setSaveError(null);
+    setForm(EMPTY_FORM);
+    setModal({ mode: "add" });
+  }
+
+  function openEdit(est: Establishment) {
+    setSaveError(null);
+    setForm({
+      name: est.name,
+      address: est.address ?? "",
+      postal_code: est.postal_code ?? "",
+      city: est.city ?? "",
+    });
+    setModal({ mode: "edit", data: est });
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) { setSaveError("Le nom est obligatoire."); return; }
+    setSaveError(null);
+    setSaving(true);
+
+    const payload = {
+      name: form.name.trim(),
+      address: form.address.trim() || null,
+      postal_code: form.postal_code.trim() || null,
+      city: form.city.trim() || null,
+    };
+
+    let error;
+    if (modal?.mode === "add") {
+      ({ error } = await getSupabase().from("establishments").insert(payload));
+    } else {
+      ({ error } = await getSupabase()
+        .from("establishments")
+        .update(payload)
+        .eq("id", modal!.data!.id));
+    }
+
+    setSaving(false);
+    if (error) { console.error("Erreur save:", error); setSaveError(error.message); return; }
+    setModal(null);
+    load();
+  }
+
+  async function handleDelete(est: Establishment) {
+    if (!confirm(`Supprimer "${est.name}" ?`)) return;
+    const { error } = await getSupabase()
+      .from("establishments")
+      .delete()
+      .eq("id", est.id);
+    if (error) console.error("Erreur suppression:", error);
+    load();
+  }
+
+  return (
+    <main className="flex-1 px-6 py-7 max-w-4xl w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-7">
+        <h1 className="text-2xl font-bold text-zinc-900">Établissements</h1>
+        <button
+          onClick={openAdd}
+          className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+        >
+          + Ajouter un établissement
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-50 border-b border-zinc-200">
+            <tr>
+              {["Nom", "Adresse", "Ville", "Actions"].map((h) => (
+                <th
+                  key={h}
+                  className={`px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider ${
+                    h === "Actions" ? "text-right" : "text-left"
+                  }`}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={4} className="py-14 text-center text-zinc-400 text-sm">
+                  Chargement…
+                </td>
+              </tr>
+            ) : establishments.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-14 text-center text-zinc-400 text-sm">
+                  Aucun établissement. Ajoutez-en un pour commencer.
+                </td>
+              </tr>
+            ) : (
+              establishments.map((est, i) => (
+                <tr
+                  key={est.id}
+                  className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
+                >
+                  <td className="px-4 py-3 font-medium text-zinc-900">{est.name}</td>
+                  <td className="px-4 py-3 text-zinc-500 text-sm">
+                    {[est.address, est.postal_code].filter(Boolean).join(", ") || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-600">{est.city || "—"}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-4">
+                      <button
+                        onClick={() => openEdit(est)}
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        onClick={() => handleDelete(est)}
+                        className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal */}
+      {modal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-zinc-900">
+                {modal.mode === "add" ? "Ajouter un établissement" : "Modifier l'établissement"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex flex-col gap-4">
+              <Field label="Nom de l'établissement *">
+                <input
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Suzette Crêperie Urbaine"
+                  className={INPUT_CLS}
+                />
+              </Field>
+
+              <Field label="Adresse">
+                <input
+                  type="text"
+                  value={form.address}
+                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                  placeholder="12 rue de la Paix"
+                  className={INPUT_CLS}
+                />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Code postal">
+                  <input
+                    type="text"
+                    value={form.postal_code}
+                    onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))}
+                    placeholder="75001"
+                    className={INPUT_CLS}
+                  />
+                </Field>
+                <Field label="Ville">
+                  <input
+                    type="text"
+                    value={form.city}
+                    onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="Paris"
+                    className={INPUT_CLS}
+                  />
+                </Field>
+              </div>
+
+              {saveError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{saveError}</p>
+              )}
+
+              <div className="flex gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setModal(null)}
+                  className="flex-1 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                >
+                  {saving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-zinc-700 mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
