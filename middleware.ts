@@ -6,7 +6,7 @@ const PUBLIC_PATHS = ["/login", "/auth/callback"];
 function readSupabaseSession(request: NextRequest): { expires_at: number } | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  console.log("[proxy] NEXT_PUBLIC_SUPABASE_URL =", supabaseUrl ?? "(undefined)");
+  console.log("[middleware] NEXT_PUBLIC_SUPABASE_URL =", supabaseUrl ?? "(undefined)");
 
   if (!supabaseUrl) return null;
 
@@ -14,16 +14,16 @@ function readSupabaseSession(request: NextRequest): { expires_at: number } | nul
   try {
     projectRef = new URL(supabaseUrl).hostname.split(".")[0];
   } catch {
-    console.log("[proxy] ERROR: could not parse supabaseUrl");
+    console.log("[middleware] ERROR: could not parse supabaseUrl");
     return null;
   }
 
   const cookieName = `sb-${projectRef}-auth-token`;
-  console.log("[proxy] looking for cookie:", cookieName);
+  console.log("[middleware] looking for cookie:", cookieName);
 
   const allCookies = request.cookies.getAll();
   console.log(
-    "[proxy] all cookies present:",
+    "[middleware] all cookies present:",
     allCookies.length === 0
       ? "(none)"
       : allCookies.map((c) => `${c.name}=${c.value.slice(0, 20)}…`).join(" | ")
@@ -34,44 +34,44 @@ function readSupabaseSession(request: NextRequest): { expires_at: number } | nul
     request.cookies.get(cookieName)?.value;
 
   if (!raw) {
-    console.log("[proxy] cookie NOT found → no session");
+    console.log("[middleware] cookie NOT found → no session");
     return null;
   }
 
-  console.log("[proxy] cookie found, raw prefix:", raw.slice(0, 30));
+  console.log("[middleware] cookie found, raw prefix:", raw.slice(0, 30));
 
   try {
     let json = raw;
     if (raw.startsWith("base64-")) {
       json = Buffer.from(raw.slice(7), "base64url").toString("utf-8");
-      console.log("[proxy] decoded base64url, json prefix:", json.slice(0, 60));
+      console.log("[middleware] decoded base64url, json prefix:", json.slice(0, 60));
     } else {
-      console.log("[proxy] plain JSON, prefix:", json.slice(0, 60));
+      console.log("[middleware] plain JSON, prefix:", json.slice(0, 60));
     }
     const parsed = JSON.parse(json) as { expires_at?: number };
     const expiresAt = parsed?.expires_at ?? 0;
     const now = Math.floor(Date.now() / 1000);
     console.log(
-      `[proxy] expires_at=${expiresAt} now=${now} valid=${expiresAt > now}`
+      `[middleware] expires_at=${expiresAt} now=${now} valid=${expiresAt > now}`
     );
     return { expires_at: expiresAt };
   } catch (err) {
-    console.log("[proxy] ERROR parsing cookie:", err);
+    console.log("[middleware] ERROR parsing cookie:", err);
     return null;
   }
 }
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  console.log(`[proxy] ${request.method} ${pathname} — isPublic=${isPublic}`);
+  console.log(`[middleware] ${request.method} ${pathname} — isPublic=${isPublic}`);
 
   const session = readSupabaseSession(request);
   const isAuthenticated =
     session !== null && session.expires_at * 1000 > Date.now();
 
-  console.log(`[proxy] isAuthenticated=${isAuthenticated} → action=${
+  console.log(`[middleware] isAuthenticated=${isAuthenticated} → action=${
     !isAuthenticated && !isPublic ? "redirect /login" :
     isAuthenticated && pathname === "/login" ? "redirect /planning" :
     "pass"
