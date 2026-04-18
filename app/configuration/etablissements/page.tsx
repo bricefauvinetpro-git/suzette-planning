@@ -12,11 +12,11 @@ type ModalState = {
 } | null;
 
 type EstForm = {
-  nom: string;
-  adresse: string;
+  name: string;
+  address: string;
 };
 
-const EMPTY_FORM: EstForm = { nom: "", adresse: "" };
+const EMPTY_FORM: EstForm = { name: "", address: "" };
 
 const INPUT_CLS =
   "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
@@ -37,8 +37,8 @@ export default function EtablissementsPage() {
     setLoadError(null);
     const { data, error } = await getSupabase()
       .from("establishments")
-      .select("*")
-      .order("nom");
+      .select("id, name, address")
+      .order("name");
     if (error) {
       console.error("Erreur chargement établissements:", error);
       setLoadError(error.message);
@@ -55,22 +55,19 @@ export default function EtablissementsPage() {
 
   function openEdit(est: Establishment) {
     setSaveError(null);
-    setForm({
-      nom: est.nom,
-      adresse: est.adresse ?? "",
-    });
+    setForm({ name: est.name, address: est.address ?? "" });
     setModal({ mode: "edit", data: est });
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.nom.trim()) { setSaveError("Le nom est obligatoire."); return; }
+    if (!form.name.trim()) { setSaveError("Le nom est obligatoire."); return; }
     setSaveError(null);
     setSaving(true);
 
     const payload = {
-      nom: form.nom.trim(),
-      adresse: form.adresse.trim() || null,
+      name: form.name.trim(),
+      address: form.address.trim() || null,
     };
 
     let error;
@@ -90,7 +87,7 @@ export default function EtablissementsPage() {
   }
 
   async function handleDelete(est: Establishment) {
-    if (!confirm(`Supprimer "${est.nom}" ?`)) return;
+    if (!confirm(`Supprimer "${est.name}" ?`)) return;
     const { error } = await getSupabase()
       .from("establishments")
       .delete()
@@ -101,7 +98,6 @@ export default function EtablissementsPage() {
 
   return (
     <main className="flex-1 px-6 py-7 max-w-4xl w-full">
-      {/* Header */}
       <div className="flex items-center justify-between mb-7">
         <h1 className="text-2xl font-bold text-zinc-900">Établissements</h1>
         <button
@@ -112,14 +108,12 @@ export default function EtablissementsPage() {
         </button>
       </div>
 
-      {/* Load error banner */}
       {loadError && (
         <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
           Erreur lors du chargement des établissements : {loadError}
         </div>
       )}
 
-      {/* Table */}
       <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-zinc-50 border-b border-zinc-200">
@@ -155,8 +149,8 @@ export default function EtablissementsPage() {
                   key={est.id}
                   className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
                 >
-                  <td className="px-4 py-3 font-medium text-zinc-900">{est.nom}</td>
-                  <td className="px-4 py-3 text-zinc-500 text-sm">{est.adresse || "—"}</td>
+                  <td className="px-4 py-3 font-medium text-zinc-900">{est.name}</td>
+                  <td className="px-4 py-3 text-zinc-500 text-sm">{est.address || "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-4">
                       <button
@@ -180,7 +174,6 @@ export default function EtablissementsPage() {
         </table>
       </div>
 
-      {/* Modal */}
       {modal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -206,8 +199,8 @@ export default function EtablissementsPage() {
                 <input
                   type="text"
                   required
-                  value={form.nom}
-                  onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))}
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="Suzette Crêperie Urbaine"
                   className={INPUT_CLS}
                 />
@@ -216,8 +209,8 @@ export default function EtablissementsPage() {
               <Field label="Adresse">
                 <input
                   type="text"
-                  value={form.adresse}
-                  onChange={(e) => setForm((f) => ({ ...f, adresse: e.target.value }))}
+                  value={form.address}
+                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                   placeholder="12 rue de la Paix, 75001 Paris"
                   className={INPUT_CLS}
                 />
