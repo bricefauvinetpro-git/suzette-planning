@@ -4,9 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import { shiftDurationMinutes } from "@/lib/week-utils";
-import type { TeamMember } from "@/types/index";
+import type { TeamMember, EmployeeDocument } from "@/types/index";
 
 const CONTRACT_TYPES = ["CDI", "CDD", "Extra", "Apprentissage", "Stage"];
+
+const DOC_TYPES = [
+  "Contrat d'extra",
+  "Contrat CDI",
+  "Contrat CDD",
+  "Bulletin de paie",
+  "Autre",
+];
 
 const WEEK_DAYS = [
   { key: "lundi", label: "Lundi" },
@@ -21,7 +29,7 @@ const WEEK_DAYS = [
 const INPUT_CLS =
   "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
 
-type Tab = "info" | "contract" | "time";
+type Tab = "info" | "contract" | "time" | "docs";
 
 type InfoForm = {
   firstName: string;
@@ -68,6 +76,15 @@ export default function EmployeeProfile({ id }: { id: string }) {
   const [monthlyData, setMonthlyData] = useState<MonthEntry[]>([]);
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
 
+  // Documents tab state
+  const [docs, setDocs] = useState<EmployeeDocument[]>([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadDocType, setUploadDocType] = useState(DOC_TYPES[0]);
+  const [uploadDocName, setUploadDocName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   useEffect(() => { loadData(); }, [id]);
 
   async function loadData() {
@@ -76,7 +93,7 @@ export default function EmployeeProfile({ id }: { id: string }) {
     since.setFullYear(since.getFullYear() - 1);
     const sinceStr = since.toISOString().split("T")[0];
 
-    const [{ data: m, error: mErr }, { data: shifts }] = await Promise.all([
+    const [{ data: m, error: mErr }, { data: shifts }, { data: docsData }] = await Promise.all([
       getSupabase().from("team_members").select("*").eq("id", id).single(),
       getSupabase()
         .from("shifts")
@@ -84,6 +101,11 @@ export default function EmployeeProfile({ id }: { id: string }) {
         .eq("employee_id", id)
         .gte("date", sinceStr)
         .order("date"),
+      getSupabase()
+        .from("employee_documents")
+        .select("*")
+        .eq("employee_id", id)
+        .order("created_at", { ascending: false }),
     ]);
 
     if (mErr || !m) { setNotFound(true); setLoading(false); return; }
@@ -125,7 +147,17 @@ export default function EmployeeProfile({ id }: { id: string }) {
         Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month))
       );
     }
+    setDocs((docsData as EmployeeDocument[]) ?? []);
     setLoading(false);
+  }
+
+  async function loadDocs() {
+    const { data } = await getSupabase()
+      .from("employee_documents")
+      .select("*")
+      .eq("employee_id", id)
+      .order("created_at", { ascending: false });
+    setDocs((data as EmployeeDocument[]) ?? []);
   }
 
   async function handleSaveInfo(e: React.FormEvent) {
@@ -180,6 +212,59 @@ export default function EmployeeProfile({ id }: { id: string }) {
     if (error) console.error("Erreur disponibilité:", error);
   }
 
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedFile) return;
+    setUploadError(null);
+    setUploading(true);
+
+    const safeFileName = `${Date.now()}_${selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const path = `${id}/${safeFileName}`;
+
+    const { error: storageErr } = await getSupabase()
+      .storage.from("documents")
+      .upload(path, selectedFile, { contentType: "application/pdf" });
+
+    if (storageErr) {
+      setUploadError(storageErr.message);
+      setUploading(false);
+      return;
+    }
+
+    const displayName = uploadDocName.trim() || selectedFile.name;
+    const { error: dbErr } = await getSupabase()
+      .from("employee_documents")
+      .insert({ employee_id: id, file_name: displayName, file_type: uploadDocType, storage_path: path });
+
+    if (dbErr) {
+      await getSupabase().storage.from("documents").remove([path]);
+      setUploadError(dbErr.message);
+      setUploading(false);
+      return;
+    }
+
+    setShowUploadModal(false);
+    setUploadDocName("");
+    setUploadDocType(DOC_TYPES[0]);
+    setSelectedFile(null);
+    setUploading(false);
+    loadDocs();
+  }
+
+  function handleViewDoc(doc: EmployeeDocument) {
+    const { data } = getSupabase().storage.from("documents").getPublicUrl(doc.storage_path);
+    window.open(data.publicUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleDeleteDoc(doc: EmployeeDocument) {
+    if (!confirm(`Supprimer "${doc.file_name}" ?`)) return;
+    await Promise.all([
+      getSupabase().storage.from("documents").remove([doc.storage_path]),
+      getSupabase().from("employee_documents").delete().eq("id", doc.id),
+    ]);
+    loadDocs();
+  }
+
   function initials(name: string) {
     return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
   }
@@ -217,6 +302,7 @@ export default function EmployeeProfile({ id }: { id: string }) {
     { id: "info", label: "Informations personnelles" },
     { id: "contract", label: "Contrat" },
     { id: "time", label: "Temps & planification" },
+    { id: "docs", label: "Documents" },
   ];
 
   return (
@@ -435,6 +521,82 @@ export default function EmployeeProfile({ id }: { id: string }) {
             </section>
           )}
 
+          {/* ── Tab: Documents ── */}
+          {activeTab === "docs" && (
+            <section>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-base font-semibold text-zinc-900">Documents</h2>
+                <button
+                  onClick={() => { setUploadError(null); setShowUploadModal(true); }}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+                >
+                  + Ajouter un document
+                </button>
+              </div>
+
+              {docs.length === 0 ? (
+                <p className="text-sm text-zinc-400">Aucun document enregistré pour cet employé.</p>
+              ) : (
+                <div className="rounded-lg border border-zinc-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-zinc-50 border-b border-zinc-200">
+                      <tr>
+                        {["Nom", "Type", "Date d'ajout", "Actions"].map((h) => (
+                          <th
+                            key={h}
+                            className={`px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wider ${h === "Actions" ? "text-right" : "text-left"}`}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docs.map((doc, i) => (
+                        <tr
+                          key={doc.id}
+                          className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
+                        >
+                          <td className="px-4 py-3 font-medium text-zinc-900 max-w-[200px] truncate">
+                            {doc.file_name}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600">
+                              {doc.file_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-500 text-xs whitespace-nowrap">
+                            {new Date(doc.created_at).toLocaleDateString("fr-FR", {
+                              day: "numeric", month: "short", year: "numeric",
+                            })}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-3">
+                              <button
+                                onClick={() => handleViewDoc(doc)}
+                                title="Voir / télécharger"
+                                className="text-base hover:opacity-60 transition-opacity"
+                              >
+                                👁
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDoc(doc)}
+                                title="Supprimer"
+                                className="text-base hover:opacity-60 transition-opacity"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* ── Tab: Temps & planification ── */}
           {activeTab === "time" && (
             <section className="flex flex-col gap-8">
@@ -531,6 +693,68 @@ export default function EmployeeProfile({ id }: { id: string }) {
           )}
         </div>
       </div>
+
+      {/* ── Upload modal ── */}
+      {showUploadModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowUploadModal(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-zinc-900">Ajouter un document</h2>
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleUpload} className="flex flex-col gap-4">
+              <LabeledInput label="Type de document">
+                <select value={uploadDocType} onChange={(e) => setUploadDocType(e.target.value)} className={INPUT_CLS}>
+                  {DOC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </LabeledInput>
+              <LabeledInput label="Nom (optionnel)">
+                <input type="text" value={uploadDocName}
+                  onChange={(e) => setUploadDocName(e.target.value)}
+                  placeholder="Contrat Marie Dupont — Avril 2026"
+                  className={INPUT_CLS} />
+              </LabeledInput>
+              <LabeledInput label="Fichier PDF">
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  required
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm text-zinc-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                />
+              </LabeledInput>
+              {selectedFile && (
+                <p className="text-xs text-zinc-400 -mt-2">
+                  {selectedFile.name} — {Math.round(selectedFile.size / 1024)} Ko
+                </p>
+              )}
+              {uploadError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{uploadError}</p>
+              )}
+              <div className="flex gap-3 mt-1">
+                <button type="button" onClick={() => setShowUploadModal(false)}
+                  className="flex-1 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors">
+                  Annuler
+                </button>
+                <button type="submit" disabled={uploading || !selectedFile}
+                  className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-60">
+                  {uploading ? "Upload en cours…" : "Uploader"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
