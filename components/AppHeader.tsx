@@ -2,12 +2,15 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { Settings, ChevronRight, ChevronLeft, Menu, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Settings, ChevronRight, ChevronLeft, Menu, X, LogOut } from "lucide-react";
 import { useEstablishment } from "@/lib/establishment-context";
+import { getSupabase } from "@/lib/supabase";
 
 type SettingsPanel = "root" | "configuration";
 
 export default function AppHeader() {
+  const router = useRouter();
   const { establishments, selectedId, setSelectedId, loading } = useEstablishment();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -35,6 +38,12 @@ export default function AppHeader() {
   function closeSettings() {
     setSettingsOpen(false);
     setSettingsPanel("root");
+  }
+
+  async function handleSignOut() {
+    await getSupabase().auth.signOut();
+    document.cookie = "suzette_role=; path=/; max-age=0";
+    router.replace("/login");
   }
 
   return (
@@ -98,6 +107,14 @@ export default function AppHeader() {
                   >
                     <span className="font-medium">Configuration</span>
                     <ChevronRight size={14} className="text-zinc-400 shrink-0" />
+                  </button>
+                  <div className="mx-1 my-1 border-t border-zinc-100" />
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut size={14} className="shrink-0" />
+                    Se déconnecter
                   </button>
                 </div>
               )}
@@ -163,6 +180,14 @@ export default function AppHeader() {
                   <Settings size={14} />
                   Établissements
                 </Link>
+                <div className="mx-1 my-1.5 border-t border-zinc-100" />
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut size={14} className="shrink-0" />
+                  Se déconnecter
+                </button>
               </div>
             </div>
           )}

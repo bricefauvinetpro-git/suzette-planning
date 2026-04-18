@@ -81,6 +81,10 @@ export default function EmployeeProfile({ id }: { id: string }) {
   const [savingRole, setSavingRole] = useState(false);
   const [roleError, setRoleError] = useState<string | null>(null);
 
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSent, setInviteSent] = useState(false);
+
   // Documents tab state
   const [docs, setDocs] = useState<EmployeeDocument[]>([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -271,6 +275,22 @@ export default function EmployeeProfile({ id }: { id: string }) {
     loadDocs();
   }
 
+  async function handleInvite() {
+    if (!member?.email) return;
+    setInviteError(null);
+    setInviting(true);
+    const res = await fetch("/api/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: member.email, employeeId: member.id }),
+    });
+    const json = await res.json();
+    setInviting(false);
+    if (!res.ok) { setInviteError(json.error ?? "Erreur lors de l'invitation."); return; }
+    setInviteSent(true);
+    loadData();
+  }
+
   async function handleSaveRole(e: React.FormEvent) {
     e.preventDefault();
     if (!member) return;
@@ -455,12 +475,47 @@ export default function EmployeeProfile({ id }: { id: string }) {
                   </div>
                 </form>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5">
-                  <InfoField label="Prénom" value={member.full_name.split(" ")[0]} />
-                  <InfoField label="Nom" value={member.full_name.split(" ").slice(1).join(" ")} />
-                  <InfoField label="Email" value={member.email} />
-                  <InfoField label="Téléphone" value={member.phone} />
-                  <InfoField label="Date de naissance" value={displayDate(member.birth_date)} />
+                <div className="flex flex-col gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5">
+                    <InfoField label="Prénom" value={member.full_name.split(" ")[0]} />
+                    <InfoField label="Nom" value={member.full_name.split(" ").slice(1).join(" ")} />
+                    <InfoField label="Email" value={member.email} />
+                    <InfoField label="Téléphone" value={member.phone} />
+                    <InfoField label="Date de naissance" value={displayDate(member.birth_date)} />
+                  </div>
+
+                  {/* Invitation */}
+                  {member.email && (
+                    <div className="pt-4 border-t border-zinc-100">
+                      <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
+                        Accès à l&apos;application
+                      </p>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {member.auth_user_id ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                            Compte actif
+                          </span>
+                        ) : (member.invitation_sent_at || inviteSent) ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Invitation envoyée
+                          </span>
+                        ) : (
+                          <button
+                            onClick={handleInvite}
+                            disabled={inviting}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600 text-xs font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                          >
+                            {inviting ? "Envoi…" : "Envoyer une invitation"}
+                          </button>
+                        )}
+                        {inviteError && (
+                          <span className="text-xs text-red-600">{inviteError}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </section>

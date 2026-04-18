@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _client: SupabaseClient<any> | null = null;
@@ -11,7 +12,7 @@ export function getSupabase(): SupabaseClient<any> {
     if (!url || !key) {
       throw new Error("Supabase env vars are missing");
     }
-    _client = createClient(url, key);
+    _client = createBrowserClient(url, key);
   }
   return _client;
 }

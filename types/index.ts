@@ -15,6 +15,8 @@ export type TeamMember = {
   availability: Record<string, boolean> | null;
   establishment_id: string | null;
   user_role: string | null;
+  auth_user_id: string | null;
+  invitation_sent_at: string | null;
   created_at: string;
 };
 
