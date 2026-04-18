@@ -48,20 +48,3 @@ export type EmployeeDocument = {
   storage_path: string;
   created_at: string;
 };
-
-export type Database = {
-  public: {
-    Tables: {
-      team_members: {
-        Row: TeamMember;
-        Insert: Omit<TeamMember, "id" | "created_at">;
-        Update: Partial<Omit<TeamMember, "id" | "created_at">>;
-      };
-      shifts: {
-        Row: Shift;
-        Insert: Omit<Shift, "id" | "created_at">;
-        Update: Partial<Omit<Shift, "id" | "created_at">>;
-      };
-    };
-  };
-};

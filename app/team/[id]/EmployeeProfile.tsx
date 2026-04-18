@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import { shiftDurationMinutes } from "@/lib/week-utils";
 import type { TeamMember, EmployeeDocument } from "@/types/index";
+import { initials } from "@/lib/utils";
 
 const CONTRACT_TYPES = ["CDI", "CDD", "Extra", "Apprentissage", "Stage"];
 
@@ -263,10 +264,6 @@ export default function EmployeeProfile({ id }: { id: string }) {
       getSupabase().from("employee_documents").delete().eq("id", doc.id),
     ]);
     loadDocs();
-  }
-
-  function initials(name: string) {
-    return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
   }
 
   function displayDate(iso: string | null) {

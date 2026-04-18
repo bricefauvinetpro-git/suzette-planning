@@ -1,4 +1,5 @@
 import type { TeamMember } from "@/types/index";
+import { initials } from "@/lib/utils";
 
 type Props = {
   member: TeamMember;
@@ -7,13 +8,6 @@ type Props = {
 
 export default function EmployeeAvatar({ member, size = "md" }: Props) {
   const dim = size === "sm" ? "w-6 h-6 text-[10px]" : "w-9 h-9 text-sm";
-  const initials = member.full_name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   if (member.avatar_url) {
     return (
       <img
@@ -30,7 +24,7 @@ export default function EmployeeAvatar({ member, size = "md" }: Props) {
       style={{ backgroundColor: member.color }}
       title={member.full_name}
     >
-      {initials}
+      {initials(member.full_name)}
     </span>
   );
 }

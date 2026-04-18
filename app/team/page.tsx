@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import type { TeamMember } from "@/types/index";
 import { useEstablishment } from "@/lib/establishment-context";
+import { initials } from "@/lib/utils";
 
 const CONTRACT_TYPES = ["CDI", "CDD", "Extra", "Apprentissage", "Stage"] as const;
 
@@ -75,7 +76,6 @@ export default function TeamPage() {
       establishment_id: selectedId,
     };
 
-    console.log("INSERT team_members payload:", payload);
     setSaving(true);
 
     const { error } = await getSupabase()
@@ -103,15 +103,6 @@ export default function TeamPage() {
       .eq("id", id);
     if (error) console.error("Erreur suppression:", error);
     if (selectedId) loadMembers(selectedId);
-  }
-
-  function initials(name: string) {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase();
   }
 
   const COLS = ["Nom", "Rôle", "Contrat", "Heures / sem.", "Couleur", "Actions"];

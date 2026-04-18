@@ -130,7 +130,6 @@ export default function WeeklyPlanningGrid() {
         notes: form.notes.trim() || null,
         color: modal.member.color,
       };
-      console.log("INSERT shift:", payload);
       ({ error } = await getSupabase().from("shifts").insert(payload));
     } else if (modal.shift) {
       const patch = {
@@ -140,7 +139,6 @@ export default function WeeklyPlanningGrid() {
         break_minutes: form.break_minutes,
         notes: form.notes.trim() || null,
       };
-      console.log("UPDATE shift:", modal.shift.id, patch);
       ({ error } = await getSupabase()
         .from("shifts")
         .update(patch)
