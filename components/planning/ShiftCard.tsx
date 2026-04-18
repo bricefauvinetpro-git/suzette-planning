@@ -1,4 +1,5 @@
 import type { ShiftWithMember } from "@/types/index";
+import { formatTime } from "@/lib/week-utils";
 
 type Props = {
   shift: ShiftWithMember;
@@ -40,7 +41,7 @@ export default function ShiftCard({ shift, onClick }: Props) {
         {label ?? "Shift"}
       </p>
       <p className="text-[11px] leading-tight mt-0.5" style={{ color: subColor }}>
-        {start_time}–{end_time}
+        {formatTime(start_time)}–{formatTime(end_time)}
       </p>
     </div>
   );

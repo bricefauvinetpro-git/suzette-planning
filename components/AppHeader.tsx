@@ -2,41 +2,39 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { Settings, ChevronRight, ChevronLeft } from "lucide-react";
+import { Settings, ChevronRight, ChevronLeft, Menu, X } from "lucide-react";
 import { useEstablishment } from "@/lib/establishment-context";
 
-type Panel = "root" | "configuration";
+type SettingsPanel = "root" | "configuration";
 
 export default function AppHeader() {
   const { establishments, selectedId, setSelectedId, loading } = useEstablishment();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [panel, setPanel] = useState<Panel>("root");
-  const menuRef = useRef<HTMLDivElement>(null);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>("root");
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-        setPanel("root");
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+        setSettingsPanel("root");
+      }
+      if (mobileRef.current && !mobileRef.current.contains(e.target as Node)) {
+        setMobileOpen(false);
       }
     }
-    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
+    if (settingsOpen || mobileOpen)
+      document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
+  }, [settingsOpen, mobileOpen]);
 
-  function toggleMenu() {
-    if (menuOpen) {
-      setMenuOpen(false);
-      setPanel("root");
-    } else {
-      setMenuOpen(true);
-      setPanel("root");
-    }
-  }
-
-  function closeMenu() {
-    setMenuOpen(false);
-    setPanel("root");
+  function closeSettings() {
+    setSettingsOpen(false);
+    setSettingsPanel("root");
   }
 
   return (
@@ -62,9 +60,9 @@ export default function AppHeader() {
           </select>
         )}
 
-        <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
-
-        <nav className="flex items-center gap-5 flex-1">
+        {/* Desktop separator + nav */}
+        <span className="hidden md:inline" style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
+        <nav className="hidden md:flex items-center gap-5 flex-1">
           <Link href="/planning" className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
             Planning
           </Link>
@@ -73,28 +71,29 @@ export default function AppHeader() {
           </Link>
         </nav>
 
-        {/* Settings */}
-        <div className="relative" ref={menuRef}>
+        {/* Spacer on mobile */}
+        <div className="flex-1 md:hidden" />
+
+        {/* Desktop settings ⚙️ */}
+        <div className="relative hidden md:block" ref={settingsRef}>
           <button
-            onClick={toggleMenu}
+            onClick={() => { setSettingsOpen((o) => !o); setSettingsPanel("root"); }}
             className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
             style={{
-              color: menuOpen ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.6)",
-              backgroundColor: menuOpen ? "rgba(255,255,255,0.12)" : "transparent",
+              color: settingsOpen ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.6)",
+              backgroundColor: settingsOpen ? "rgba(255,255,255,0.12)" : "transparent",
             }}
-            title="Paramètres"
+            title="Configuration"
           >
             <Settings size={17} />
           </button>
 
-          {menuOpen && (
+          {settingsOpen && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-xl shadow-xl border border-zinc-100 bg-white overflow-hidden z-50">
-
-              {/* Panel root */}
-              {panel === "root" && (
+              {settingsPanel === "root" && (
                 <div className="p-1.5">
                   <button
-                    onClick={() => setPanel("configuration")}
+                    onClick={() => setSettingsPanel("configuration")}
                     className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
                   >
                     <span className="font-medium">Configuration</span>
@@ -102,12 +101,10 @@ export default function AppHeader() {
                   </button>
                 </div>
               )}
-
-              {/* Panel configuration */}
-              {panel === "configuration" && (
+              {settingsPanel === "configuration" && (
                 <div className="p-1.5">
                   <button
-                    onClick={() => setPanel("root")}
+                    onClick={() => setSettingsPanel("root")}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600 transition-colors mb-0.5"
                   >
                     <ChevronLeft size={14} className="shrink-0" />
@@ -116,14 +113,57 @@ export default function AppHeader() {
                   <div className="mx-1 mb-1.5 border-t border-zinc-100" />
                   <Link
                     href="/configuration/etablissements"
-                    onClick={closeMenu}
+                    onClick={closeSettings}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
                   >
                     Établissements
                   </Link>
                 </div>
               )}
+            </div>
+          )}
+        </div>
 
+        {/* Mobile ☰ */}
+        <div className="relative md:hidden" ref={mobileRef}>
+          <button
+            onClick={() => setMobileOpen((o) => !o)}
+            className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
+            style={{
+              color: mobileOpen ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.6)",
+              backgroundColor: mobileOpen ? "rgba(255,255,255,0.12)" : "transparent",
+            }}
+          >
+            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+
+          {mobileOpen && (
+            <div className="absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl border border-zinc-100 bg-white overflow-hidden z-50">
+              <div className="p-1.5">
+                <Link
+                  href="/planning"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                >
+                  Planning
+                </Link>
+                <Link
+                  href="/team"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                >
+                  Équipe
+                </Link>
+                <div className="mx-1 my-1.5 border-t border-zinc-100" />
+                <Link
+                  href="/configuration/etablissements"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-colors"
+                >
+                  <Settings size={14} />
+                  Établissements
+                </Link>
+              </div>
             </div>
           )}
         </div>

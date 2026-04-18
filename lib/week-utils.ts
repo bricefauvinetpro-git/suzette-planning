@@ -42,6 +42,10 @@ export function addWeeks(date: Date, weeks: number): Date {
   return d;
 }
 
+export function formatTime(time: string): string {
+  return time.slice(0, 5);
+}
+
 export function shiftDurationMinutes(
   start: string,
   end: string,

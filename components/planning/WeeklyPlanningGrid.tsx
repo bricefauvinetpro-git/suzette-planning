@@ -34,9 +34,18 @@ export default function WeeklyPlanningGrid() {
   const [modalSaving, setModalSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
+  const [colWidth, setColWidth] = useState(200);
+
   const weekDates = getWeekDates(referenceDate);
   const startDate = formatDate(weekDates[0]);
   const endDate = formatDate(weekDates[6]);
+
+  useEffect(() => {
+    function update() { setColWidth(window.innerWidth < 768 ? 120 : 200); }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
     if (estLoading || !selectedId) return;
@@ -201,11 +210,11 @@ export default function WeeklyPlanningGrid() {
 
       {/* Grid */}
       <div className="overflow-x-auto flex-1">
-        <table className="w-full border-collapse text-sm" style={{ minWidth: 900 }}>
+        <table className="w-full border-collapse text-sm" style={{ minWidth: colWidth + 7 * 90 }}>
           <colgroup>
-            <col style={{ width: 200 }} />
+            <col style={{ width: colWidth }} />
             {weekDates.map((d) => (
-              <col key={d.toISOString()} style={{ minWidth: 120 }} />
+              <col key={d.toISOString()} style={{ minWidth: 90 }} />
             ))}
           </colgroup>
 
@@ -264,29 +273,22 @@ export default function WeeklyPlanningGrid() {
                     }`}
                   >
                     {/* Employee column */}
-                    <td className="px-4 py-3 border-r border-zinc-100">
-                      <div className="flex items-center gap-2.5">
-                        <EmployeeAvatar member={member} />
+                    <td className="px-2 md:px-4 py-2 md:py-3 border-r border-zinc-100">
+                      <div className="flex items-center gap-1.5 md:gap-2.5">
+                        <EmployeeAvatar member={member} size="sm" />
                         <div className="min-w-0">
-                          <p className="font-semibold text-zinc-900 text-sm leading-tight truncate">
-                            {member.full_name}
+                          <p className="font-semibold text-zinc-900 text-xs md:text-sm leading-tight truncate">
+                            <span className="md:hidden">{member.full_name.split(" ")[0]}</span>
+                            <span className="hidden md:inline">{member.full_name}</span>
                           </p>
-                          <p className="text-xs text-zinc-400 leading-tight mt-0.5">
+                          <p className="text-xs text-zinc-400 leading-tight mt-0.5 hidden md:block">
                             {member.role}
                           </p>
-                          <p className="text-[11px] leading-tight mt-0.5">
-                            <span
-                              className={
-                                planned > member.contract_hours
-                                  ? "text-amber-600 font-medium"
-                                  : "text-zinc-400"
-                              }
-                            >
+                          <p className="text-[11px] leading-tight mt-0.5 hidden md:block">
+                            <span className={planned > member.contract_hours ? "text-amber-600 font-medium" : "text-zinc-400"}>
                               {planned}h
                             </span>
-                            <span className="text-zinc-300">
-                              {" "}/ {member.contract_hours}h
-                            </span>
+                            <span className="text-zinc-300"> / {member.contract_hours}h</span>
                           </p>
                         </div>
                       </div>
@@ -300,7 +302,7 @@ export default function WeeklyPlanningGrid() {
                         <td
                           key={d.toISOString()}
                           onClick={() => openCreate(member, d)}
-                          className={`px-2 py-2 border-r border-zinc-100 align-top cursor-pointer transition-colors group ${
+                          className={`px-1 py-1 md:px-2 md:py-2 border-r border-zinc-100 align-top cursor-pointer transition-colors group ${
                             today ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-zinc-50"
                           }`}
                           style={{ minHeight: 72 }}
