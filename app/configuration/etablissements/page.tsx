@@ -12,11 +12,11 @@ type ModalState = {
 } | null;
 
 type EstForm = {
-  name: string;
-  address: string;
+  nom: string;
+  adresse: string;
 };
 
-const EMPTY_FORM: EstForm = { name: "", address: "" };
+const EMPTY_FORM: EstForm = { nom: "", adresse: "" };
 
 const INPUT_CLS =
   "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
@@ -37,13 +37,13 @@ export default function EtablissementsPage() {
     setLoadError(null);
     const { data, error } = await getSupabase()
       .from("establishments")
-      .select("id, name, address")
-      .order("name");
+      .select("*")
+      .order("nom");
     if (error) {
       console.error("Erreur chargement établissements:", error);
       setLoadError(error.message);
     }
-    setEstablishments(data ?? []);
+    setEstablishments((data as Establishment[]) ?? []);
     setLoading(false);
   }
 
@@ -56,21 +56,21 @@ export default function EtablissementsPage() {
   function openEdit(est: Establishment) {
     setSaveError(null);
     setForm({
-      name: est.name,
-      address: est.address ?? "",
+      nom: est.nom,
+      adresse: est.adresse ?? "",
     });
     setModal({ mode: "edit", data: est });
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setSaveError("Le nom est obligatoire."); return; }
+    if (!form.nom.trim()) { setSaveError("Le nom est obligatoire."); return; }
     setSaveError(null);
     setSaving(true);
 
     const payload = {
-      name: form.name.trim(),
-      address: form.address.trim() || null,
+      nom: form.nom.trim(),
+      adresse: form.adresse.trim() || null,
     };
 
     let error;
@@ -90,7 +90,7 @@ export default function EtablissementsPage() {
   }
 
   async function handleDelete(est: Establishment) {
-    if (!confirm(`Supprimer "${est.name}" ?`)) return;
+    if (!confirm(`Supprimer "${est.nom}" ?`)) return;
     const { error } = await getSupabase()
       .from("establishments")
       .delete()
@@ -155,8 +155,8 @@ export default function EtablissementsPage() {
                   key={est.id}
                   className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
                 >
-                  <td className="px-4 py-3 font-medium text-zinc-900">{est.name}</td>
-                  <td className="px-4 py-3 text-zinc-500 text-sm">{est.address || "—"}</td>
+                  <td className="px-4 py-3 font-medium text-zinc-900">{est.nom}</td>
+                  <td className="px-4 py-3 text-zinc-500 text-sm">{est.adresse || "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-4">
                       <button
@@ -206,8 +206,8 @@ export default function EtablissementsPage() {
                 <input
                   type="text"
                   required
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  value={form.nom}
+                  onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))}
                   placeholder="Suzette Crêperie Urbaine"
                   className={INPUT_CLS}
                 />
@@ -216,8 +216,8 @@ export default function EtablissementsPage() {
               <Field label="Adresse">
                 <input
                   type="text"
-                  value={form.address}
-                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                  value={form.adresse}
+                  onChange={(e) => setForm((f) => ({ ...f, adresse: e.target.value }))}
                   placeholder="12 rue de la Paix, 75001 Paris"
                   className={INPUT_CLS}
                 />
