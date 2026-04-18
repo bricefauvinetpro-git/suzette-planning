@@ -6,7 +6,7 @@ import { Settings } from "lucide-react";
 import { useEstablishment } from "@/lib/establishment-context";
 
 export default function AppHeader() {
-  const { establishments, selectedId, setSelectedId } = useEstablishment();
+  const { establishments, selectedId, setSelectedId, loading } = useEstablishment();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -26,6 +26,23 @@ export default function AppHeader() {
         <span className="text-white font-bold text-lg tracking-tight shrink-0">
           Suzette
         </span>
+
+        {/* Establishment switcher */}
+        {!loading && establishments.length > 0 && (
+          <select
+            value={selectedId ?? ""}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="text-sm font-medium rounded-md px-2 py-1 border-0 outline-none cursor-pointer"
+            style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.9)" }}
+          >
+            {establishments.map((est) => (
+              <option key={est.id} value={est.id} style={{ backgroundColor: "#1a1a2e" }}>
+                {est.name}
+              </option>
+            ))}
+          </select>
+        )}
+
         <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
 
         <nav className="flex items-center gap-5 flex-1">
@@ -37,7 +54,7 @@ export default function AppHeader() {
           </Link>
         </nav>
 
-        {/* Settings button */}
+        {/* Settings */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((o) => !o)}
@@ -51,54 +68,20 @@ export default function AppHeader() {
             <Settings size={17} />
           </button>
 
-          {/* Dropdown */}
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-64 rounded-xl shadow-xl border border-zinc-100 bg-white overflow-hidden z-50">
-              {/* Header */}
+            <div className="absolute right-0 top-full mt-2 w-56 rounded-xl shadow-xl border border-zinc-100 bg-white overflow-hidden z-50">
               <div className="px-4 py-2.5">
                 <p className="text-xs font-semibold text-zinc-900">Configuration</p>
               </div>
-
               <div className="mx-3 border-t border-zinc-100" />
-
-              {/* Établissement actif */}
-              <div className="px-3 pt-2.5 pb-1">
-                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider px-1 mb-1.5">
-                  Établissement actif
-                </p>
-                <div className="flex flex-col gap-0.5">
-                  {establishments.map((est) => {
-                    const active = est.id === selectedId;
-                    return (
-                      <button
-                        key={est.id}
-                        onClick={() => { setSelectedId(est.id); setMenuOpen(false); }}
-                        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                          active ? "bg-indigo-50 text-indigo-700 font-medium" : "text-zinc-700 hover:bg-zinc-50"
-                        }`}
-                      >
-                        <span>{est.name}</span>
-                        {active && (
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="mx-3 my-2 border-t border-zinc-100" />
-
-              {/* Gérer */}
-              <div className="px-3 pb-3">
+              <div className="p-1.5">
                 <Link
                   href="/configuration/etablissements"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
                 >
-                  Gérer les établissements
+                  <span className="text-base leading-none">🏢</span>
+                  Établissements
                 </Link>
               </div>
             </div>
