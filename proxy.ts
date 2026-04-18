@@ -2,13 +2,25 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // If env vars are missing, block everything except public paths
+  if (!supabaseUrl || !supabaseKey) {
+    const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+    return isPublic ? NextResponse.next({ request }) : NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  let response = NextResponse.next({ request });
+  let session = null;
+
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
@@ -21,25 +33,33 @@ export async function proxy(request: NextRequest) {
           );
         },
       },
-    }
-  );
+    });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const { pathname } = request.nextUrl;
+    // getSession() reads the JWT from cookies locally — no network call.
+    // Preferred over getUser() in proxy to avoid network failures causing silent pass-through.
+    const { data } = await supabase.auth.getSession();
+    session = data.session;
+  } catch {
+    // On any error treat as unauthenticated — safer to redirect than to allow through
+  }
 
-  const publicPaths = ["/login", "/auth/callback"];
-  if (!user && !publicPaths.includes(pathname)) {
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+  // Unauthenticated → /login
+  if (!session && !isPublic) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (user && publicPaths.includes(pathname)) {
+  // Authenticated on login page → /planning
+  if (session && pathname === "/login") {
     return NextResponse.redirect(new URL("/planning", request.url));
   }
 
-  if (user) {
+  // Role-based restriction: employees can only access /planning
+  if (session) {
     const role = request.cookies.get("suzette_role")?.value;
-    const restricted = pathname.startsWith("/team") || pathname.startsWith("/configuration");
-    if (role === "employee" && restricted) {
+    const isRestricted = pathname.startsWith("/team") || pathname.startsWith("/configuration");
+    if (role === "employee" && isRestricted) {
       return NextResponse.redirect(new URL("/planning", request.url));
     }
   }
