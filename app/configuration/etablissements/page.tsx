@@ -30,16 +30,21 @@ export default function EtablissementsPage() {
   const [form, setForm] = useState<EstForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
     const { data, error } = await getSupabase()
       .from("establishments")
-      .select("*")
+      .select("id, name, address, postal_code, city, created_at")
       .order("name");
-    if (error) console.error("Erreur chargement établissements:", error);
+    if (error) {
+      console.error("Erreur chargement établissements:", error);
+      setLoadError(error.message);
+    }
     setEstablishments(data ?? []);
     setLoading(false);
   }
@@ -112,6 +117,13 @@ export default function EtablissementsPage() {
           + Ajouter un établissement
         </button>
       </div>
+
+      {/* Load error banner */}
+      {loadError && (
+        <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          Erreur lors du chargement des établissements : {loadError}
+        </div>
+      )}
 
       {/* Table */}
       <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
