@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+// nav links temporarily replaced with <a> for diagnosis
 import { Settings, ChevronRight, ChevronLeft, Menu, X, LogOut } from "lucide-react";
 import { useEstablishment } from "@/lib/establishment-context";
 import { getSupabase } from "@/lib/supabase";
@@ -84,13 +85,13 @@ export default function AppHeader() {
         {/* Desktop separator + nav */}
         <span className="hidden md:inline" style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
         <nav className="hidden md:flex items-center gap-5 flex-1">
-          <Link href="/planning" className={navLinkCls("/planning")}>
+          <a href="/planning" className={navLinkCls("/planning")}>
             Planning
-          </Link>
+          </a>
           {userRole !== "employee" && (
-            <Link href="/team" className={navLinkCls("/team")}>
+            <a href="/team" className={navLinkCls("/team")}>
               Équipe
-            </Link>
+            </a>
           )}
         </nav>
 
@@ -171,21 +172,19 @@ export default function AppHeader() {
           {mobileOpen && (
             <div className="absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl border border-zinc-100 bg-white overflow-hidden z-50">
               <div className="p-1.5">
-                <Link
+                <a
                   href="/planning"
-                  onClick={() => setMobileOpen(false)}
                   className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${pathname === "/planning" ? "bg-zinc-100 text-zinc-900" : "text-zinc-700 hover:bg-zinc-50"}`}
                 >
                   Planning
-                </Link>
+                </a>
                 {userRole !== "employee" && (
-                  <Link
+                  <a
                     href="/team"
-                    onClick={() => setMobileOpen(false)}
                     className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${pathname.startsWith("/team") ? "bg-zinc-100 text-zinc-900" : "text-zinc-700 hover:bg-zinc-50"}`}
                   >
                     Équipe
-                  </Link>
+                  </a>
                 )}
                 <div className="mx-1 my-1.5 border-t border-zinc-100" />
                 <Link
