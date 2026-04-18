@@ -27,11 +27,12 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  if (!user && pathname !== "/login") {
+  const publicPaths = ["/login", "/auth/callback"];
+  if (!user && !publicPaths.includes(pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (user && pathname === "/login") {
+  if (user && publicPaths.includes(pathname)) {
     return NextResponse.redirect(new URL("/planning", request.url));
   }
 
