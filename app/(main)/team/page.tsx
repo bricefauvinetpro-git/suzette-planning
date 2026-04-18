@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Send } from "lucide-react";
 import { getSupabase } from "@/lib/supabase";
 import type { TeamMember } from "@/types/index";
 import { useEstablishment } from "@/lib/establishment-context";
 import { initials } from "@/lib/utils";
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
 
 const CONTRACT_TYPES = ["CDI", "CDD", "Extra", "Apprentissage", "Stage"] as const;
 
@@ -36,6 +42,11 @@ export default function TeamPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+
+  // Invitation state
+  const [inviting, setInviting] = useState<string | null>(null);
+  const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
+  const [inviteSentAt, setInviteSentAt] = useState<Record<string, string>>({});
 
   async function loadMembers(estId: string) {
     setLoading(true);
@@ -95,6 +106,26 @@ export default function TeamPage() {
     if (selectedId) loadMembers(selectedId);
   }
 
+  async function handleInvite(member: TeamMember) {
+    if (!member.email) return;
+    setInviting(member.id);
+    setInviteErrors((prev) => ({ ...prev, [member.id]: "" }));
+
+    const res = await fetch("/api/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: member.email, employeeId: member.id }),
+    });
+    const json = await res.json();
+
+    if (!res.ok) {
+      setInviteErrors((prev) => ({ ...prev, [member.id]: json.error ?? "Erreur" }));
+    } else {
+      setInviteSentAt((prev) => ({ ...prev, [member.id]: new Date().toISOString() }));
+    }
+    setInviting(null);
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Supprimer cet employé du planning ?")) return;
     const { error } = await getSupabase()
@@ -105,7 +136,7 @@ export default function TeamPage() {
     if (selectedId) loadMembers(selectedId);
   }
 
-  const COLS = ["Nom", "Rôle", "Contrat", "Heures / sem.", "Couleur", "Actions"];
+  const COLS = ["Nom", "Rôle", "Contrat", "Heures / sem.", "Couleur", "Invitation", "Actions"];
 
   return (
     <main className="flex-1 px-4 py-6 max-w-5xl mx-auto w-full">
@@ -203,6 +234,39 @@ export default function TeamPage() {
                       />
                       <span className="text-xs text-zinc-400 font-mono">{m.color}</span>
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {m.auth_user_id ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        Compte actif
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs text-zinc-500 whitespace-nowrap">
+                            {(inviteSentAt[m.id] ?? m.invitation_sent_at)
+                              ? `Envoyée le ${formatDate(inviteSentAt[m.id] ?? m.invitation_sent_at!)}`
+                              : "Non envoyée"}
+                          </span>
+                          {inviteErrors[m.id] && (
+                            <span className="text-xs text-red-500 truncate">{inviteErrors[m.id]}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleInvite(m)}
+                          disabled={inviting === m.id || !m.email}
+                          title={m.email ? `Inviter ${m.email}` : "Aucun email renseigné"}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                        >
+                          {inviting === m.id ? (
+                            <span className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Send size={13} />
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <button
