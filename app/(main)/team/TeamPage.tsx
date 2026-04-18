@@ -139,7 +139,7 @@ export default function TeamPage() {
   const COLS = ["Nom", "Rôle", "Contrat", "Heures / sem.", "Couleur", "Invitation", "Actions"];
 
   return (
-    <main className="flex-1 px-4 py-6 max-w-5xl mx-auto w-full">
+    <main className="flex-1 px-4 py-6 max-w-7xl mx-auto w-full">
       {/* Page header */}
       <div className="flex items-center justify-between mb-6 px-2">
         <div>
@@ -160,7 +160,7 @@ export default function TeamPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-zinc-50 border-b border-zinc-200">
             <tr>
