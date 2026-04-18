@@ -30,7 +30,7 @@ const WEEK_DAYS = [
 const INPUT_CLS =
   "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
 
-type Tab = "info" | "contract" | "time" | "docs";
+type Tab = "info" | "contract" | "time" | "docs" | "role";
 
 type InfoForm = {
   firstName: string;
@@ -76,6 +76,10 @@ export default function EmployeeProfile({ id }: { id: string }) {
 
   const [monthlyData, setMonthlyData] = useState<MonthEntry[]>([]);
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
+
+  const [userRole, setUserRole] = useState<string>("employee");
+  const [savingRole, setSavingRole] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   // Documents tab state
   const [docs, setDocs] = useState<EmployeeDocument[]>([]);
@@ -133,6 +137,7 @@ export default function EmployeeProfile({ id }: { id: string }) {
       tm.availability ??
         Object.fromEntries(WEEK_DAYS.map(({ key }) => [key, key !== "dimanche"]))
     );
+    setUserRole(tm.user_role ?? "employee");
 
     if (shifts) {
       const byMonth: Record<string, MonthEntry> = {};
@@ -266,6 +271,20 @@ export default function EmployeeProfile({ id }: { id: string }) {
     loadDocs();
   }
 
+  async function handleSaveRole(e: React.FormEvent) {
+    e.preventDefault();
+    if (!member) return;
+    setRoleError(null);
+    setSavingRole(true);
+    const { error } = await getSupabase()
+      .from("team_members")
+      .update({ user_role: userRole })
+      .eq("id", member.id);
+    setSavingRole(false);
+    if (error) { setRoleError(error.message); return; }
+    loadData();
+  }
+
   function displayDate(iso: string | null) {
     if (!iso) return "—";
     return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR");
@@ -300,6 +319,7 @@ export default function EmployeeProfile({ id }: { id: string }) {
     { id: "contract", label: "Contrat" },
     { id: "time", label: "Temps & planification" },
     { id: "docs", label: "Documents" },
+    { id: "role", label: "Rôle et permissions" },
   ];
 
   return (
@@ -686,6 +706,108 @@ export default function EmployeeProfile({ id }: { id: string }) {
                   })}
                 </div>
               </div>
+            </section>
+          )}
+          {/* ── Tab: Rôle et permissions ── */}
+          {activeTab === "role" && (
+            <section>
+              <h2 className="text-base font-semibold text-zinc-900 mb-5">Rôle et permissions</h2>
+
+              <form onSubmit={handleSaveRole} className="flex flex-col gap-6">
+                {/* Role selector */}
+                <div className="flex flex-col gap-3">
+                  {[
+                    {
+                      value: "employee",
+                      label: "Employé",
+                      description: "Peut se connecter et voir son planning uniquement",
+                    },
+                    {
+                      value: "admin",
+                      label: "Administrateur",
+                      description: "Accès complet à toutes les fonctionnalités",
+                    },
+                  ].map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                        userRole === opt.value
+                          ? "border-indigo-400 bg-indigo-50"
+                          : "border-zinc-200 hover:border-zinc-300 bg-white"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="user_role"
+                        value={opt.value}
+                        checked={userRole === opt.value}
+                        onChange={() => setUserRole(opt.value)}
+                        className="mt-0.5 accent-indigo-600"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-900">{opt.label}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">{opt.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Permissions table */}
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-700 mb-3">Tableau des permissions</h3>
+                  <div className="rounded-lg border border-zinc-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-zinc-50 border-b border-zinc-200">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Permission</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">Employé</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">Admin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { section: "Planning", label: "Voir son planning", employee: true, admin: true },
+                          { section: null, label: "Créer / modifier / supprimer des shifts", employee: false, admin: true },
+                          { section: "Équipe", label: "Voir la liste des employés", employee: false, admin: true },
+                          { section: null, label: "Ajouter / modifier / supprimer un employé", employee: false, admin: true },
+                          { section: "Configuration", label: "Accès aux établissements", employee: false, admin: true },
+                        ].map((row, i) => (
+                          <tr key={i} className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}>
+                            <td className="px-4 py-2.5 text-zinc-700">
+                              {row.section && (
+                                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mr-2">
+                                  {row.section}
+                                </span>
+                              )}
+                              {row.label}
+                            </td>
+                            <td className="px-4 py-2.5 text-center text-base">
+                              {row.employee ? "✅" : "❌"}
+                            </td>
+                            <td className="px-4 py-2.5 text-center text-base">
+                              {row.admin ? "✅" : "❌"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {roleError && (
+                  <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{roleError}</p>
+                )}
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={savingRole}
+                    className="px-5 py-2 rounded-lg bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                  >
+                    {savingRole ? "Enregistrement…" : "Enregistrer"}
+                  </button>
+                </div>
+              </form>
             </section>
           )}
         </div>

@@ -173,6 +173,15 @@ export default function TeamPage() {
                       <span className="font-medium text-zinc-900 group-hover:text-indigo-600 transition-colors">
                         {m.full_name}
                       </span>
+                      {m.user_role === "admin" ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+                          Admin
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-500 uppercase tracking-wide">
+                          Employé
+                        </span>
+                      )}
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{m.role || "—"}</td>
