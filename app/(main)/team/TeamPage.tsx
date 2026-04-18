@@ -1,0 +1,399 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Send } from "lucide-react";
+import { getSupabase } from "@/lib/supabase";
+import type { TeamMember } from "@/types/index";
+import { useEstablishment } from "@/lib/establishment-context";
+import { initials } from "@/lib/utils";
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+const CONTRACT_TYPES = ["CDI", "CDD", "Extra", "Apprentissage", "Stage"] as const;
+
+type FormState = {
+  full_name: string;
+  role: string;
+  contract_type: string;
+  contract_hours: number;
+  color: string;
+};
+
+const DEFAULT_FORM: FormState = {
+  full_name: "",
+  role: "",
+  contract_type: "CDI",
+  contract_hours: 35,
+  color: "#6366f1",
+};
+
+const INPUT_CLS =
+  "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white";
+
+export default function TeamPage() {
+  const { selectedId, loading: estLoading } = useEstablishment();
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+
+  // Invitation state
+  const [inviting, setInviting] = useState<string | null>(null);
+  const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
+  const [inviteSentAt, setInviteSentAt] = useState<Record<string, string>>({});
+
+  async function loadMembers(estId: string) {
+    setLoading(true);
+    const { data, error } = await getSupabase()
+      .from("team_members")
+      .select("*")
+      .eq("active", true)
+      .eq("establishment_id", estId)
+      .order("full_name");
+    if (error) console.error("Erreur chargement équipe:", error);
+    setMembers(data ?? []);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (estLoading || !selectedId) return;
+    loadMembers(selectedId);
+  }, [selectedId, estLoading]);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setSaveError(null);
+
+    const trimmedName = form.full_name.trim();
+    if (!trimmedName) {
+      setSaveError("Le nom complet est requis.");
+      return;
+    }
+
+    const payload = {
+      full_name: trimmedName,
+      role: form.role.trim(),
+      contract_type: form.contract_type,
+      contract_hours: form.contract_hours,
+      color: form.color,
+      avatar_url: null,
+      active: true,
+      establishment_id: selectedId,
+    };
+
+    setSaving(true);
+
+    const { error } = await getSupabase()
+      .from("team_members")
+      .insert(payload);
+
+    setSaving(false);
+
+    if (error) {
+      console.error("Erreur INSERT team_members:", error);
+      setSaveError(`Erreur : ${error.message}`);
+      return;
+    }
+
+    setShowModal(false);
+    setForm(DEFAULT_FORM);
+    if (selectedId) loadMembers(selectedId);
+  }
+
+  async function handleInvite(member: TeamMember) {
+    if (!member.email) return;
+    setInviting(member.id);
+    setInviteErrors((prev) => ({ ...prev, [member.id]: "" }));
+
+    const res = await fetch("/api/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: member.email, employeeId: member.id }),
+    });
+    const json = await res.json();
+
+    if (!res.ok) {
+      setInviteErrors((prev) => ({ ...prev, [member.id]: json.error ?? "Erreur" }));
+    } else {
+      setInviteSentAt((prev) => ({ ...prev, [member.id]: new Date().toISOString() }));
+    }
+    setInviting(null);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Supprimer cet employé du planning ?")) return;
+    const { error } = await getSupabase()
+      .from("team_members")
+      .update({ active: false })
+      .eq("id", id);
+    if (error) console.error("Erreur suppression:", error);
+    if (selectedId) loadMembers(selectedId);
+  }
+
+  const COLS = ["Nom", "Rôle", "Contrat", "Heures / sem.", "Couleur", "Invitation", "Actions"];
+
+  return (
+    <main className="flex-1 px-4 py-6 max-w-7xl mx-auto w-full">
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-6 px-2">
+        <div>
+          <Link
+            href="/planning"
+            className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors mb-1 block"
+          >
+            ← Retour au planning
+          </Link>
+          <h1 className="text-xl font-bold text-zinc-900">Équipe</h1>
+        </div>
+        <button
+          onClick={() => { setSaveError(null); setShowModal(true); }}
+          className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+        >
+          + Ajouter un collaborateur
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-50 border-b border-zinc-200">
+            <tr>
+              {COLS.map((col) => (
+                <th
+                  key={col}
+                  className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
+                  {col}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={COLS.length} className="py-14 text-center text-zinc-400 text-sm">
+                  Chargement…
+                </td>
+              </tr>
+            ) : members.length === 0 ? (
+              <tr>
+                <td colSpan={COLS.length} className="py-14 text-center text-zinc-400 text-sm">
+                  Aucun employé actif. Ajoutez votre premier collaborateur.
+                </td>
+              </tr>
+            ) : (
+              members.map((m, i) => (
+                <tr
+                  key={m.id}
+                  className={`border-b border-zinc-100 ${i % 2 === 0 ? "bg-white" : "bg-zinc-50/40"}`}
+                >
+                  <td className="px-4 py-3">
+                    <Link href={`/team/${m.id}`} className="flex items-center gap-2.5 group">
+                      <span
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
+                        style={{ backgroundColor: m.color }}
+                      >
+                        {initials(m.full_name)}
+                      </span>
+                      <span className="font-medium text-zinc-900 group-hover:text-indigo-600 transition-colors">
+                        {m.full_name}
+                      </span>
+                      {m.user_role === "admin" ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+                          Admin
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-500 uppercase tracking-wide">
+                          Employé
+                        </span>
+                      )}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-zinc-600">{m.role || "—"}</td>
+                  <td className="px-4 py-3">
+                    {m.contract_type ? (
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                        {m.contract_type}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-600">{m.contract_hours}h</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-5 h-5 rounded-full border border-zinc-200 shrink-0"
+                        style={{ backgroundColor: m.color }}
+                      />
+                      <span className="text-xs text-zinc-400 font-mono">{m.color}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {m.auth_user_id ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        Compte actif
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs text-zinc-500 whitespace-nowrap">
+                            {(inviteSentAt[m.id] ?? m.invitation_sent_at)
+                              ? `Envoyée le ${formatDate(inviteSentAt[m.id] ?? m.invitation_sent_at!)}`
+                              : "Non envoyée"}
+                          </span>
+                          {inviteErrors[m.id] && (
+                            <span className="text-xs text-red-500 truncate">{inviteErrors[m.id]}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleInvite(m)}
+                          disabled={inviting === m.id || !m.email}
+                          title={m.email ? `Inviter ${m.email}` : "Aucun email renseigné"}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                        >
+                          {inviting === m.id ? (
+                            <span className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Send size={13} />
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleDelete(m.id)}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                    >
+                      Supprimer
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-lg font-semibold text-zinc-900 mb-5">
+              Ajouter un collaborateur
+            </h2>
+
+            <form onSubmit={handleAdd} className="flex flex-col gap-4">
+              <Field label="Prénom & Nom">
+                <input
+                  type="text"
+                  required
+                  value={form.full_name}
+                  onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+                  placeholder="Marie Dupont"
+                  className={INPUT_CLS}
+                />
+              </Field>
+
+              <Field label="Poste / Métier">
+                <input
+                  type="text"
+                  value={form.role}
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                  placeholder="Serveuse, Cuisinier…"
+                  className={INPUT_CLS}
+                />
+              </Field>
+
+              <Field label="Type de contrat">
+                <select
+                  value={form.contract_type}
+                  onChange={(e) => setForm((f) => ({ ...f, contract_type: e.target.value }))}
+                  className={INPUT_CLS}
+                >
+                  {CONTRACT_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Heures contractuelles / semaine">
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={60}
+                  value={form.contract_hours}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, contract_hours: Number(e.target.value) }))
+                  }
+                  className={INPUT_CLS}
+                />
+              </Field>
+
+              <Field label="Couleur d'identification">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.color}
+                    onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+                    className="w-10 h-10 rounded-lg border border-zinc-200 cursor-pointer p-0.5"
+                  />
+                  <span className="text-sm text-zinc-500 font-mono">{form.color}</span>
+                  <span
+                    className="w-8 h-8 rounded-full border border-zinc-200 shrink-0"
+                    style={{ backgroundColor: form.color }}
+                  />
+                </div>
+              </Field>
+
+              {saveError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                  {saveError}
+                </p>
+              )}
+
+              <div className="flex gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                >
+                  {saving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-zinc-700 mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
