@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Settings, ChevronRight, ChevronLeft, Menu, X, LogOut } from "lucide-react";
 import { useEstablishment } from "@/lib/establishment-context";
 import { getSupabase } from "@/lib/supabase";
@@ -11,7 +11,14 @@ type SettingsPanel = "root" | "configuration";
 
 export default function AppHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const { establishments, selectedId, setSelectedId, loading } = useEstablishment();
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const match = document.cookie.match(/suzette_role=([^;]+)/);
+    setUserRole(match ? match[1] : null);
+  }, []);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>("root");
@@ -46,8 +53,13 @@ export default function AppHeader() {
     router.replace("/login");
   }
 
+  const navLinkCls = (href: string) => {
+    const active = pathname === href || pathname.startsWith(href + "/");
+    return `text-sm font-medium transition-colors ${active ? "text-white" : "text-white/60 hover:text-white/90"}`;
+  };
+
   return (
-    <header style={{ backgroundColor: "#1a1a2e" }}>
+    <header style={{ backgroundColor: "#1a1a2e" }} className="relative z-20">
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <span className="text-white font-bold text-lg tracking-tight shrink-0">
           Suzette
@@ -72,12 +84,14 @@ export default function AppHeader() {
         {/* Desktop separator + nav */}
         <span className="hidden md:inline" style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
         <nav className="hidden md:flex items-center gap-5 flex-1">
-          <Link href="/planning" className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+          <Link href="/planning" className={navLinkCls("/planning")}>
             Planning
           </Link>
-          <Link href="/team" className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
-            Équipe
-          </Link>
+          {userRole !== "employee" && (
+            <Link href="/team" className={navLinkCls("/team")}>
+              Équipe
+            </Link>
+          )}
         </nav>
 
         {/* Spacer on mobile */}
@@ -160,17 +174,19 @@ export default function AppHeader() {
                 <Link
                   href="/planning"
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                  className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${pathname === "/planning" ? "bg-zinc-100 text-zinc-900" : "text-zinc-700 hover:bg-zinc-50"}`}
                 >
                   Planning
                 </Link>
-                <Link
-                  href="/team"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
-                >
-                  Équipe
-                </Link>
+                {userRole !== "employee" && (
+                  <Link
+                    href="/team"
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${pathname.startsWith("/team") ? "bg-zinc-100 text-zinc-900" : "text-zinc-700 hover:bg-zinc-50"}`}
+                  >
+                    Équipe
+                  </Link>
+                )}
                 <div className="mx-1 my-1.5 border-t border-zinc-100" />
                 <Link
                   href="/configuration/etablissements"
