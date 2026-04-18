@@ -20,8 +20,6 @@ export default function AppHeader() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  const selectedName = establishments.find((e) => e.id === selectedId)?.name;
-
   return (
     <header style={{ backgroundColor: "#1a1a2e" }}>
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
@@ -39,29 +37,32 @@ export default function AppHeader() {
           </Link>
         </nav>
 
-        {/* Settings trigger */}
+        {/* Settings button */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
             style={{
               color: menuOpen ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.6)",
               backgroundColor: menuOpen ? "rgba(255,255,255,0.12)" : "transparent",
             }}
-            title="Paramètres"
+            title="Configuration"
           >
-            {selectedName && (
-              <span className="text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>
-                {selectedName}
-              </span>
-            )}
             <Settings size={17} />
           </button>
 
           {/* Dropdown */}
           {menuOpen && (
             <div className="absolute right-0 top-full mt-2 w-64 rounded-xl shadow-xl border border-zinc-100 bg-white overflow-hidden z-50">
-              <div className="px-3 pt-3 pb-1">
+              {/* Header */}
+              <div className="px-4 py-2.5">
+                <p className="text-xs font-semibold text-zinc-900">Configuration</p>
+              </div>
+
+              <div className="mx-3 border-t border-zinc-100" />
+
+              {/* Établissement actif */}
+              <div className="px-3 pt-2.5 pb-1">
                 <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider px-1 mb-1.5">
                   Établissement actif
                 </p>
@@ -90,6 +91,7 @@ export default function AppHeader() {
 
               <div className="mx-3 my-2 border-t border-zinc-100" />
 
+              {/* Gérer */}
               <div className="px-3 pb-3">
                 <Link
                   href="/configuration/etablissements"
