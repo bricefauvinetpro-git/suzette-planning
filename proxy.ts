@@ -3,41 +3,60 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
-/**
- * Reads the Supabase session cookie directly without using createServerClient.
- * The docs recommend "optimistic checks" (cookie read only) in proxy — no async
- * client initialization, no network calls, no lock contention.
- *
- * Cookie name follows the @supabase/supabase-js convention:
- *   sb-{first-hostname-segment}-auth-token   (or chunked as .0, .1, …)
- * Value is base64url-encoded JSON or plain JSON containing { expires_at: number }.
- */
 function readSupabaseSession(request: NextRequest): { expires_at: number } | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  console.log("[proxy] NEXT_PUBLIC_SUPABASE_URL =", supabaseUrl ?? "(undefined)");
+
   if (!supabaseUrl) return null;
 
   let projectRef: string;
   try {
     projectRef = new URL(supabaseUrl).hostname.split(".")[0];
   } catch {
+    console.log("[proxy] ERROR: could not parse supabaseUrl");
     return null;
   }
 
   const cookieName = `sb-${projectRef}-auth-token`;
-  // Token may be split into chunks (.0, .1, …); first chunk carries expires_at
+  console.log("[proxy] looking for cookie:", cookieName);
+
+  const allCookies = request.cookies.getAll();
+  console.log(
+    "[proxy] all cookies present:",
+    allCookies.length === 0
+      ? "(none)"
+      : allCookies.map((c) => `${c.name}=${c.value.slice(0, 20)}…`).join(" | ")
+  );
+
   const raw =
     request.cookies.get(`${cookieName}.0`)?.value ??
     request.cookies.get(cookieName)?.value;
 
-  if (!raw) return null;
+  if (!raw) {
+    console.log("[proxy] cookie NOT found → no session");
+    return null;
+  }
+
+  console.log("[proxy] cookie found, raw prefix:", raw.slice(0, 30));
 
   try {
     let json = raw;
     if (raw.startsWith("base64-")) {
       json = Buffer.from(raw.slice(7), "base64url").toString("utf-8");
+      console.log("[proxy] decoded base64url, json prefix:", json.slice(0, 60));
+    } else {
+      console.log("[proxy] plain JSON, prefix:", json.slice(0, 60));
     }
-    return JSON.parse(json) as { expires_at: number };
-  } catch {
+    const parsed = JSON.parse(json) as { expires_at?: number };
+    const expiresAt = parsed?.expires_at ?? 0;
+    const now = Math.floor(Date.now() / 1000);
+    console.log(
+      `[proxy] expires_at=${expiresAt} now=${now} valid=${expiresAt > now}`
+    );
+    return { expires_at: expiresAt };
+  } catch (err) {
+    console.log("[proxy] ERROR parsing cookie:", err);
     return null;
   }
 }
@@ -46,20 +65,26 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  const session = readSupabaseSession(request);
-  const isAuthenticated = session !== null && session.expires_at * 1000 > Date.now();
+  console.log(`[proxy] ${request.method} ${pathname} — isPublic=${isPublic}`);
 
-  // Unauthenticated on a protected route → /login
+  const session = readSupabaseSession(request);
+  const isAuthenticated =
+    session !== null && session.expires_at * 1000 > Date.now();
+
+  console.log(`[proxy] isAuthenticated=${isAuthenticated} → action=${
+    !isAuthenticated && !isPublic ? "redirect /login" :
+    isAuthenticated && pathname === "/login" ? "redirect /planning" :
+    "pass"
+  }`);
+
   if (!isAuthenticated && !isPublic) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Authenticated landing on /login → /planning
   if (isAuthenticated && pathname === "/login") {
     return NextResponse.redirect(new URL("/planning", request.url));
   }
 
-  // Role-based restriction: employees cannot access /team or /configuration
   if (isAuthenticated) {
     const role = request.cookies.get("suzette_role")?.value;
     const isRestricted =
